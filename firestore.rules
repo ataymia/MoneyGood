@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+    
+    function isDealParticipant(dealData) {
+      return isAuthenticated() && 
+        (request.auth.uid == dealData.creatorUid || 
+         request.auth.uid == dealData.participantUid);
+    }
+    
+    // Users collection
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid);
+      // Only allow updating non-sensitive fields
+      allow update: if isOwner(uid) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['stripeConnectAccountId', 'createdAt']);
+    }
+    
+    // User notifications
+    match /users/{uid}/notifications/{notificationId} {
+      allow read: if isOwner(uid);
+      allow write: if isOwner(uid);
+    }
+    
+    // Deals collection
+    match /deals/{dealId} {
+      allow read: if isDealParticipant(resource.data);
+      // Creation happens only through Cloud Functions
+      allow create: if false;
+      // Updates restricted to non-sensitive fields only
+      allow update: if isDealParticipant(resource.data) && 
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['status', 'inviteToken', 'setupFeeCents', 'fairnessHoldA', 'fairnessHoldB', 
+                   'extensionFeesTotalCents', 'stripeCheckoutSessionId', 'participantUid']);
+      allow delete: if false;
+      
+      // Deal actions subcollection (audit log)
+      match /actions/{actionId} {
+        allow read: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow write: if false; // Only Cloud Functions can write
+      }
+      
+      // Deal payments subcollection
+      match /payments/{paymentId} {
+        allow read: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow write: if false; // Only Cloud Functions can write
+      }
+      
+      // Deal dispute subcollection
+      match /dispute/{disputeId} {
+        allow read: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow write: if false; // Only Cloud Functions can write
+      }
+    }
+  }
+}
