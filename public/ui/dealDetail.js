@@ -326,11 +326,24 @@ function formatDealType(type) {
 }
 
 // Action handlers (global scope for onclick)
-window.copyInviteLink = () => {
+window.copyInviteLink = async () => {
   const input = document.getElementById('invite-url-input');
-  input.select();
-  document.execCommand('copy');
-  showToast('Invite link copied!', 'success');
+  const text = input.value;
+  
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      showToast('Invite link copied!', 'success');
+    } else {
+      // Fallback for older browsers
+      input.select();
+      document.execCommand('copy');
+      showToast('Invite link copied!', 'success');
+    }
+  } catch (error) {
+    console.error('Failed to copy:', error);
+    showToast('Failed to copy link. Please copy manually.', 'error');
+  }
 };
 
 window.handlePayment = async (dealId, purpose) => {

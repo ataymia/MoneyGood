@@ -28,7 +28,6 @@ export async function renderSettings() {
     </div>
   `;
   
-  setupEventListeners();
   loadUserSettings(user.uid);
 }
 
@@ -209,9 +208,7 @@ async function loadUserSettings(userId) {
   }
 }
 
-function setupEventListeners() {
-  // Theme change is handled inline
-}
+
 
 // Global handlers
 window.handleThemeChange = async (theme) => {

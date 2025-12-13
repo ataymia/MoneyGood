@@ -27,6 +27,9 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
 
 // Firebase configuration
+// ⚠️ IMPORTANT: Replace these placeholder values with your actual Firebase project credentials
+// Get your config from Firebase Console > Project Settings > Your apps > Web app
+// See .env.template for required environment variables
 const firebaseConfig = {
   apiKey: "AIzaSyDEMO_KEY_REPLACE_WITH_ACTUAL",
   authDomain: "moneygood-app.firebaseapp.com",

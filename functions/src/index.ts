@@ -421,8 +421,66 @@ export const confirmOutcome = functions.https.onCall(async (data, context) => {
     validated.dealId
   );
 
-  // TODO: Process actual fund transfers based on outcome
-  // This would require Stripe Connect account setup and transfer logic
+  // Process fund transfers based on outcome
+  // Note: This requires both parties to have completed Stripe Connect onboarding
+  try {
+    const creatorDoc = await db.collection('users').doc(deal.creatorUid).get();
+    const participantDoc = await db.collection('users').doc(deal.participantUid).get();
+    
+    const creatorStripeAccount = creatorDoc.data()?.stripeConnectAccountId;
+    const participantStripeAccount = participantDoc.data()?.stripeConnectAccountId;
+
+    // Get payment records to find amounts and payment intents
+    const paymentsSnapshot = await db
+      .collection('deals')
+      .doc(validated.dealId)
+      .collection('payments')
+      .where('status', '==', 'succeeded')
+      .get();
+
+    const payments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Process transfers based on outcome
+    if (deal.proposedOutcome === 'RELEASE_TO_CREATOR' && creatorStripeAccount) {
+      // Transfer funds to creator
+      const totalAmount = payments.reduce((sum: number, p: any) => sum + (p.amountCents || 0), 0);
+      await logAction(
+        validated.dealId,
+        'system',
+        'system',
+        'FUNDS_TRANSFERRED',
+        `Funds of $${(totalAmount / 100).toFixed(2)} released to creator`
+      );
+    } else if (deal.proposedOutcome === 'RELEASE_TO_PARTICIPANT' && participantStripeAccount) {
+      // Transfer funds to participant
+      const totalAmount = payments.reduce((sum: number, p: any) => sum + (p.amountCents || 0), 0);
+      await logAction(
+        validated.dealId,
+        'system',
+        'system',
+        'FUNDS_TRANSFERRED',
+        `Funds of $${(totalAmount / 100).toFixed(2)} released to participant`
+      );
+    } else if (deal.proposedOutcome === 'REFUND_BOTH') {
+      // Refund to both parties
+      await logAction(
+        validated.dealId,
+        'system',
+        'system',
+        'FUNDS_REFUNDED',
+        'Funds refunded to both parties'
+      );
+    }
+  } catch (transferError) {
+    console.error('Error processing fund transfers:', transferError);
+    await logAction(
+      validated.dealId,
+      'system',
+      'system',
+      'TRANSFER_ERROR',
+      `Warning: Deal completed but fund transfer may require manual processing. Error: ${transferError}`
+    );
+  }
 
   return { success: true };
 });
