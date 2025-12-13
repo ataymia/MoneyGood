@@ -1,6 +1,6 @@
 import { httpsCallable } from './firebase.js';
 
-// Cloud Functions API wrapper
+// Cloud Functions API wrapper 
 
 export async function createDeal(data) {
   const callable = httpsCallable(window.firebaseFunctions, 'createDeal');
