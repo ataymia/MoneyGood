@@ -5,16 +5,16 @@
   "private": true,
   "scripts": {
     "dev": "firebase emulators:start",
-    "dev:frontend": "cd public && python -m http.server 8000",
-    "build": "cd functions && npm run build",
+    "dev:frontend": "python -m http.server 8000",
+    "build": "cd firebase-functions && npm run build",
     "deploy": "npm run build && firebase deploy",
-    "deploy:functions": "cd functions && npm run build && cd .. && firebase deploy --only functions",
+    "deploy:functions": "cd firebase-functions && npm run build && cd .. && firebase deploy --only functions",
     "deploy:hosting": "firebase deploy --only hosting",
     "deploy:cloudflare": "echo 'Push to GitHub to trigger Cloudflare Pages deployment'",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
     "logs": "firebase functions:log",
-    "test:functions": "cd functions && npm test",
-    "lint": "cd functions && npm run lint"
+    "test:functions": "cd firebase-functions && npm test",
+    "lint": "cd firebase-functions && npm run lint"
   },
   "keywords": [
     "deals",

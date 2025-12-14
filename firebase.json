@@ -1,10 +1,18 @@
 {
   "hosting": {
-    "public": "public",
+    "public": ".",
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "firebase-functions/**",
+      "*.md",
+      "LICENSE",
+      "package.json",
+      ".env.template",
+      ".firebaserc",
+      "firestore.rules",
+      "firestore.indexes.json"
     ],
     "rewrites": [
       {
@@ -14,7 +22,7 @@
     ]
   },
   "functions": {
-    "source": "functions",
+    "source": "firebase-functions",
     "runtime": "nodejs20"
   },
   "firestore": {

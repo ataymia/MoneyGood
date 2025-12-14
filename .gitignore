@@ -1,7 +1,7 @@
 # Environment variables
 .env
 .env.local
-functions/.env
+firebase-functions/.env
 
 # Firebase
 .firebase/
@@ -12,11 +12,11 @@ ui-debug.log
 
 # Node modules
 node_modules/
-functions/node_modules/
-functions/lib/
+firebase-functions/node_modules/
+firebase-functions/lib/
 
 # Build outputs
-functions/lib/
+firebase-functions/lib/
 dist/
 build/
 out/

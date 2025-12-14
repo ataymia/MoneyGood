@@ -89,7 +89,7 @@ firebase deploy --only functions
    ```
 4. Select event: `checkout.session.completed`
 5. Copy the webhook signing secret (starts with `whsec_`)
-6. Add to `functions/.env`:
+6. Add to `firebase-functions/.env`:
    ```env
    STRIPE_SECRET_KEY=sk_live_your_key_here
    STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
@@ -109,7 +109,7 @@ firebase deploy --only functions
 
 #### 2.2 Update Frontend Configuration
 
-Open `public/firebase.js` and replace the placeholder values:
+Open `firebase.js` in the root directory and replace the placeholder values:
 
 ```javascript
 const firebaseConfig = {
@@ -144,10 +144,18 @@ Use these settings in the Cloudflare Pages setup:
 
 | Setting | Value |
 |---------|-------|
+| **Framework preset** | None |
 | **Project name** | `moneygood` (or your preferred name) |
 | **Production branch** | `main` |
 | **Build command** | *Leave empty* (no build needed) |
-| **Build output directory** | `public` |
+| **Build output directory** | `/` (root directory) |
+| **Root directory** | *Leave empty or `/`* |
+
+**Important Notes:**
+- The site files are in the root directory for Cloudflare Pages deployment
+- This app uses **hash-based routing** (`#/app`, `#/deal/123`), so no server-side redirects are needed
+- The `_routes.json` file tells Cloudflare which files are static assets (JS, CSS, images)
+- The `/firebase-functions` directory contains Firebase Cloud Functions (backend) - NOT Cloudflare Pages Functions
 
 #### 3.3 Add Environment Variables (Optional)
 
@@ -162,7 +170,7 @@ If you want to use environment variables instead of hardcoding Firebase config:
    - `FIREBASE_MESSAGING_SENDER_ID`: Your sender ID
    - `FIREBASE_APP_ID`: Your app ID
 
-3. Update `public/firebase.js` to use environment variables (requires a build step):
+3. Update `firebase.js` (in root) to use environment variables (requires a build step):
 
 ```javascript
 const firebaseConfig = {
@@ -202,7 +210,7 @@ After setting up a custom domain, update these configurations:
    - Add your custom domain
 
 2. **Stripe Webhook**:
-   - If your app URL changed, update `functions/.env`:
+   - If your app URL changed, update `firebase-functions/.env`:
      ```env
      APP_URL=https://app.yourdomain.com
      ```
@@ -210,19 +218,48 @@ After setting up a custom domain, update these configurations:
 
 ## Configuration Files
 
-MoneyGood includes Cloudflare-specific configuration files:
+MoneyGood includes Cloudflare-specific configuration files in the root directory:
 
-### `public/_redirects`
+### `_routes.json`
 
-Handles SPA routing by sending all requests to `index.html`:
+Tells Cloudflare Pages which files are static assets (should be served directly) vs dynamic routes (should be handled by the SPA):
 
+```json
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": [
+    "/api.js",
+    "/app.js",
+    "/firebase.js",
+    "/router.js",
+    "/store.js",
+    "/styles.css",
+    "/ui/*",
+    "/*.png",
+    "/*.jpg",
+    "/*.jpeg",
+    "/*.gif",
+    "/*.svg",
+    "/*.ico",
+    "/*.webp",
+    "/*.woff",
+    "/*.woff2",
+    "/*.ttf",
+    "/*.eot"
+  ]
+}
 ```
-/*    /index.html   200
-```
 
-This ensures routes like `/dashboard` and `/deals/:id` work correctly.
+**Why this file exists:** This prevents Cloudflare from trying to serve static assets as dynamic routes and ensures proper caching.
 
-### `public/_headers`
+**Note on Routing:** MoneyGood uses **hash-based routing** (`#/app`, `#/deal/123`, etc.), which means:
+- No server-side redirects are needed
+- All routes work without special configuration
+- Deep linking works automatically (e.g., sharing `https://yoursite.com/#/deal/123` works perfectly)
+- Page refreshes always load `index.html`, and the JavaScript router handles the hash
+
+### `_headers`
 
 Sets security headers and caching policies:
 
@@ -236,6 +273,12 @@ Sets security headers and caching policies:
 /*.js
   Cache-Control: public, max-age=31536000, immutable
 ```
+
+### `/firebase-functions` Directory
+
+**Important:** This directory contains Firebase Cloud Functions for the backend (Auth, Firestore, Stripe webhooks). This is **NOT** Cloudflare Pages Functions.
+
+The directory is named `firebase-functions` (not `functions`) to prevent Cloudflare from attempting to build it as Pages Functions during deployment. Cloudflare should only serve the static frontend files.
 
 ## Troubleshooting
 
@@ -253,7 +296,7 @@ Sets security headers and caching policies:
 1. **Check Firebase config**:
    - Open browser DevTools (F12) → Console
    - Look for Firebase configuration errors
-   - Verify you've replaced placeholder values in `public/firebase.js`
+   - Verify you've replaced placeholder values in `firebase.js`
 
 2. **Verify Firebase credentials**:
    ```javascript
@@ -283,7 +326,7 @@ Sets security headers and caching policies:
 
 **Solutions**:
 1. Check internet connection
-2. Verify CDN URLs in `public/firebase.js` are correct
+2. Verify CDN URLs in `firebase.js` are correct
 3. Check if firewall/ad blocker is blocking `gstatic.com`
 
 ### Issue: Authentication doesn't work
@@ -300,7 +343,7 @@ Sets security headers and caching policies:
 **Cause**: Cloud Functions not configured for Cloudflare domain
 
 **Solution**:
-1. In `functions/src/index.ts`, verify CORS configuration allows your domain
+1. In `firebase-functions/src/index.ts`, verify CORS configuration allows your domain
 2. Add your Cloudflare domain to allowed origins
 3. Redeploy functions: `firebase deploy --only functions`
 
@@ -308,7 +351,7 @@ Sets security headers and caching policies:
 
 **Causes**:
 1. Stripe webhook not configured
-2. Wrong webhook secret in `functions/.env`
+2. Wrong webhook secret in `firebase-functions/.env`
 3. Cloud Functions not deployed
 
 **Solutions**:
@@ -369,7 +412,7 @@ Every pull request gets a preview deployment:
 
 2. **Web Analytics** (privacy-friendly):
    - Pages → Your project → Web Analytics
-   - Add analytics snippet to `public/index.html` (optional)
+   - Add analytics snippet to `index.html` (optional)
 
 3. **Argo Smart Routing** (paid):
    - Reduces latency by routing traffic through fastest paths

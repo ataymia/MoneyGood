@@ -41,7 +41,7 @@ A **production-ready, full-stack web application** for secure two-party deals wi
 
 #### Frontend (11 files)
 ```
-public/
+root directory/
 ├── index.html              Single-page app shell
 ├── styles.css              3,500+ lines of custom CSS + Tailwind
 ├── app.js                  Main entry, routing, auth state
@@ -60,7 +60,7 @@ public/
 
 #### Backend (5 files)
 ```
-functions/src/
+firebase-functions/src/
 ├── index.ts                11 Cloud Functions
 ├── stripe.ts               Stripe integration helpers
 ├── validators.ts           Zod validation schemas

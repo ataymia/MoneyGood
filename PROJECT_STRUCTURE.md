@@ -14,24 +14,25 @@ MoneyGood/
 ├── firestore.rules                # Firestore security rules
 ├── firestore.indexes.json         # Firestore query indexes
 │
-├── public/                        # Frontend (Static files for Firebase Hosting)
-│   ├── index.html                 # Main HTML entry point
-│   ├── styles.css                 # Custom CSS + theme variables
-│   ├── app.js                     # Main app initialization & routing
-│   ├── router.js                  # Hash-based SPA router
-│   ├── firebase.js                # Firebase SDK initialization
-│   ├── api.js                     # Cloud Functions API wrapper
-│   ├── store.js                   # State management + localStorage
-│   │
-│   └── ui/                        # UI Module Files
-│       ├── components.js          # Reusable components (Button, Card, Modal, Toast, etc.)
-│       ├── auth.js                # Login & Signup pages
-│       ├── dashboard.js           # Main dashboard with deal grouping
-│       ├── dealWizard.js          # 4-step deal creation wizard
-│       ├── dealDetail.js          # Deal detail page with actions
-│       └── settings.js            # Settings page with theme toggle
+├── index.html                     # Main HTML entry point (in root for Cloudflare Pages)
+├── styles.css                     # Custom CSS + theme variables
+├── app.js                         # Main app initialization & routing
+├── router.js                      # Hash-based SPA router
+├── firebase.js                    # Firebase SDK initialization
+├── api.js                         # Cloud Functions API wrapper
+├── store.js                       # State management + localStorage
+├── _headers                       # Cloudflare Pages headers configuration
+├── _redirects                     # Cloudflare Pages redirects configuration
 │
-└── functions/                     # Backend (Cloud Functions)
+├── ui/                            # UI Module Files
+│   ├── components.js              # Reusable components (Button, Card, Modal, Toast, etc.)
+│   ├── auth.js                    # Login & Signup pages
+│   ├── dashboard.js               # Main dashboard with deal grouping
+│   ├── dealWizard.js              # 4-step deal creation wizard
+│   ├── dealDetail.js              # Deal detail page with actions
+│   └── settings.js                # Settings page with theme toggle
+│
+└── firebase-functions/            # Firebase Backend (Cloud Functions - NOT Cloudflare Pages Functions)
     ├── package.json               # Node.js dependencies
     ├── tsconfig.json              # TypeScript configuration
     │

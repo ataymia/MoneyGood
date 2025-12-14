@@ -38,8 +38,8 @@ Be respectful, constructive, and professional in all interactions.
 
 4. **Configure environment**
    - Copy `.env.template` and create `.env` files as needed
-   - Update `public/firebase.js` with your test project config
-   - Create `functions/.env` with test Stripe keys
+   - Update `firebase.js` in the root with your test project config
+   - Create `firebase-functions/.env` with test Stripe keys
 
 5. **Start Firebase Emulators**
    ```bash
@@ -54,7 +54,7 @@ Be respectful, constructive, and professional in all interactions.
 ## Project Structure
 
 ```
-/public/           # Frontend static files
+/                  # Frontend static files (in root for Cloudflare Pages)
   /ui/            # UI module files
   app.js          # Main app entry
   firebase.js     # Firebase initialization
@@ -62,7 +62,7 @@ Be respectful, constructive, and professional in all interactions.
   store.js        # State management
   api.js          # Cloud Functions API calls
   
-/functions/        # Backend Cloud Functions
+/firebase-functions/        # Backend Cloud Functions
   /src/
     index.ts      # All function definitions
     stripe.ts     # Stripe helpers
