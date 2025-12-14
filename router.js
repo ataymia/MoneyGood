@@ -31,8 +31,28 @@ class Router {
     // Parse route and params
     const { route, params } = this.parseRoute(hash);
     
+    // Try to match exact route first
+    let handler = this.routes.get(route);
+    let matchedRoute = route;
+    
+    // If no exact match, try dynamic routes
+    if (!handler) {
+      const dynamicMatch = this.findDynamicRoute(hash);
+      if (dynamicMatch) {
+        handler = dynamicMatch.handler;
+        matchedRoute = dynamicMatch.route;
+        Object.assign(params, dynamicMatch.params);
+      }
+    }
+    
+    // If still no match, show 404
+    if (!handler) {
+      this.render404();
+      return;
+    }
+    
     // Check auth requirement
-    if (this.authRequired.has(route)) {
+    if (this.authRequired.has(matchedRoute)) {
       const user = window.store?.getState()?.user;
       if (!user) {
         this.navigate('/login');
@@ -40,20 +60,33 @@ class Router {
       }
     }
 
-    // Find and execute handler
-    const handler = this.routes.get(route);
-    if (handler) {
-      this.currentRoute = route;
-      await handler(params);
-    } else {
-      // Try to match dynamic routes
-      const dynamicHandler = this.findDynamicRoute(hash);
-      if (dynamicHandler) {
-        await dynamicHandler.handler(dynamicHandler.params);
-      } else {
-        this.navigate('/');
-      }
-    }
+    // Execute handler
+    this.currentRoute = matchedRoute;
+    this.currentParams = params;
+    await handler(params);
+  }
+  
+  render404() {
+    const content = document.getElementById('content');
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div class="min-h-screen bg-gradient-to-br from-navy-900 to-navy-800 flex items-center justify-center p-4">
+        <div class="text-center">
+          <div class="text-8xl mb-6">🔍</div>
+          <h1 class="text-4xl font-bold text-white mb-4">Page Not Found</h1>
+          <p class="text-xl text-navy-300 mb-8">
+            The page you're looking for doesn't exist.
+          </p>
+          <a 
+            href="#/" 
+            class="inline-block px-8 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold"
+          >
+            Go Home
+          </a>
+        </div>
+      </div>
+    `;
   }
 
   parseRoute(hash) {
@@ -94,7 +127,7 @@ class Router {
       }
       
       if (match) {
-        return { handler, params };
+        return { handler, params, route };
       }
     }
     

@@ -11,19 +11,29 @@ export async function renderDealWizard() {
   
   const content = document.getElementById('content');
   content.innerHTML = `
-    ${Navbar({ user })}
-    <div class="min-h-screen bg-gradient-to-br from-emerald-50 to-navy-50 dark:from-navy-900 dark:to-navy-800 py-8">
-      <div class="container mx-auto px-4">
-        <div class="max-w-3xl mx-auto">
-          <div class="mb-8">
-            <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Create New Deal</h1>
-            <p class="text-navy-600 dark:text-navy-400">Set up a secure two-party transaction</p>
-          </div>
-          
-          ${ProgressBar({ percent: (currentStep / totalSteps) * 100, className: 'mb-8' })}
-          
-          <div class="bg-white dark:bg-navy-800 rounded-2xl shadow-xl p-8">
-            <div id="wizard-step"></div>
+    <div class="flex flex-col h-screen bg-navy-50 dark:bg-navy-900">
+      ${Navbar({ user })}
+      <div class="flex-1 overflow-y-auto py-8">
+        <div class="container mx-auto px-4">
+          <div class="max-w-3xl mx-auto">
+            <div class="mb-8">
+              <div class="flex items-center gap-4 mb-4">
+                <button 
+                  onclick="window.location.hash = '/app'" 
+                  class="text-navy-600 dark:text-navy-400 hover:text-navy-900 dark:hover:text-white"
+                >
+                  ← Back
+                </button>
+              </div>
+              <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Create New Deal</h1>
+              <p class="text-navy-600 dark:text-navy-400">Set up a secure two-party transaction</p>
+            </div>
+            
+            ${ProgressBar({ percent: (currentStep / totalSteps) * 100, className: 'mb-8' })}
+            
+            <div class="bg-white dark:bg-navy-800 rounded-2xl shadow-xl p-8">
+              <div id="wizard-step"></div>
+            </div>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { collection, query, where, orderBy, getDocs, onSnapshot } from '../firebase.js';
 import { Navbar, Card, formatCurrency, formatDate, showToast, Spinner } from './components.js';
+import { renderSidebar, renderMobileNav } from './navigation.js';
 import { router } from '../router.js';
 import { store } from '../store.js';
 
@@ -8,28 +9,32 @@ export async function renderDashboard() {
   
   const content = document.getElementById('content');
   content.innerHTML = `
-    ${Navbar({ user })}
-    <div class="min-h-screen bg-gradient-to-br from-emerald-50 to-navy-50 dark:from-navy-900 dark:to-navy-800">
-      <div class="container mx-auto px-4 py-8">
-        <div class="flex items-center justify-between mb-8">
-          <div>
-            <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Dashboard</h1>
-            <p class="text-navy-600 dark:text-navy-400">Manage your deals and transactions</p>
+    <div class="flex h-screen bg-navy-50 dark:bg-navy-900">
+      ${renderSidebar(user)}
+      <div class="flex-1 overflow-y-auto">
+        ${Navbar({ user })}
+        <div class="container mx-auto px-4 py-8">
+          <div class="flex items-center justify-between mb-8">
+            <div>
+              <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Dashboard</h1>
+              <p class="text-navy-600 dark:text-navy-400">Manage your deals and transactions</p>
+            </div>
+            <button 
+              onclick="window.location.hash = '/deal/new'" 
+              class="btn-primary bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition shadow-glow"
+            >
+              + New Deal
+            </button>
           </div>
-          <button 
-            onclick="window.location.hash = '/deal/new'" 
-            class="btn-primary bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition shadow-glow"
-          >
-            + New Deal
-          </button>
-        </div>
-        
-        <div id="deals-container" class="space-y-8">
-          <div class="flex items-center justify-center py-12">
-            ${Spinner({ size: 'lg' })}
+          
+          <div id="deals-container" class="space-y-8">
+            <div class="flex items-center justify-center py-12">
+              ${Spinner({ size: 'lg' })}
+            </div>
           </div>
         </div>
       </div>
+      ${renderMobileNav(user)}
     </div>
   `;
 

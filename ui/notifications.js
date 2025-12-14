@@ -2,6 +2,7 @@ import { db, collection, query, where, orderBy, onSnapshot, doc, updateDoc, getD
 import { router } from '../router.js';
 import { store } from '../store.js';
 import { Navbar, Button, Card, LoadingSpinner } from './components.js';
+import { renderSidebar, renderMobileNav } from './navigation.js';
 
 export async function renderNotifications() {
   const { user } = store.getState();
@@ -13,27 +14,31 @@ export async function renderNotifications() {
 
   const content = document.getElementById('content');
   content.innerHTML = `
-    ${Navbar({ user })}
-    <div class="min-h-screen bg-gradient-to-br from-emerald-50 to-navy-50 dark:from-navy-900 dark:to-navy-800 py-8">
-      <div class="container mx-auto px-4">
-        <div class="max-w-4xl mx-auto">
-          <!-- Header -->
-          <div class="flex items-center justify-between mb-8">
-            <h1 class="text-3xl font-bold text-navy-900 dark:text-white">Notifications</h1>
-            <button 
-              onclick="markAllAsRead()"
-              class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium transition"
-            >
-              Mark all as read
-            </button>
-          </div>
+    <div class="flex h-screen bg-navy-50 dark:bg-navy-900">
+      ${renderSidebar(user)}
+      <div class="flex-1 overflow-y-auto">
+        ${Navbar({ user })}
+        <div class="container mx-auto px-4 py-8">
+          <div class="max-w-4xl mx-auto">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-8">
+              <h1 class="text-3xl font-bold text-navy-900 dark:text-white">Notifications</h1>
+              <button 
+                onclick="markAllAsRead()"
+                class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium transition"
+              >
+                Mark all as read
+              </button>
+            </div>
 
-          <!-- Notifications List -->
-          <div id="notifications-container">
-            ${LoadingSpinner()}
+            <!-- Notifications List -->
+            <div id="notifications-container">
+              ${LoadingSpinner()}
+            </div>
           </div>
         </div>
       </div>
+      ${renderMobileNav(user)}
     </div>
   `;
 
@@ -261,3 +266,4 @@ window.addEventListener('hashchange', () => {
     window.notificationsUnsubscribe = null;
   }
 });
+

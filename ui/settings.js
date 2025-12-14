@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc, updateDoc } from '../firebase.js';
 import { Navbar, Card, Select, showToast } from './components.js';
+import { renderSidebar, renderMobileNav } from './navigation.js';
 import { setupStripeConnect } from '../api.js';
 import { store } from '../store.js';
 
@@ -8,23 +9,27 @@ export async function renderSettings() {
   
   const content = document.getElementById('content');
   content.innerHTML = `
-    ${Navbar({ user })}
-    <div class="min-h-screen bg-gradient-to-br from-emerald-50 to-navy-50 dark:from-navy-900 dark:to-navy-800 py-8">
-      <div class="container mx-auto px-4">
-        <div class="max-w-3xl mx-auto">
-          <div class="mb-8">
-            <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Settings</h1>
-            <p class="text-navy-600 dark:text-navy-400">Manage your account preferences</p>
-          </div>
-          
-          <div class="space-y-6">
-            ${renderThemeSettings(theme)}
-            ${renderStripeSettings(user)}
-            ${renderNotificationSettings(user)}
-            ${renderAccountInfo(user)}
+    <div class="flex h-screen bg-navy-50 dark:bg-navy-900">
+      ${renderSidebar(user)}
+      <div class="flex-1 overflow-y-auto">
+        ${Navbar({ user })}
+        <div class="container mx-auto px-4 py-8">
+          <div class="max-w-3xl mx-auto">
+            <div class="mb-8">
+              <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Settings</h1>
+              <p class="text-navy-600 dark:text-navy-400">Manage your account preferences</p>
+            </div>
+            
+            <div class="space-y-6">
+              ${renderThemeSettings(theme)}
+              ${renderStripeSettings(user)}
+              ${renderNotificationSettings(user)}
+              ${renderAccountInfo(user)}
+            </div>
           </div>
         </div>
       </div>
+      ${renderMobileNav(user)}
     </div>
   `;
   
@@ -254,3 +259,4 @@ window.handleNotificationToggle = async (type, enabled) => {
     showToast('Failed to update settings', 'error');
   }
 };
+

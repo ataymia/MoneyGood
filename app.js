@@ -1,4 +1,4 @@
-import { auth, db, functions, onAuthStateChanged, signOut } from './firebase.js';
+import { auth, db, functions, onAuthStateChanged, signOut, firebaseReady, firebaseError } from './firebase.js';
 import { router } from './router.js';
 import { store } from './store.js';
 import { renderLogin, renderSignup } from './ui/auth.js';
@@ -7,59 +7,100 @@ import { renderDealWizard } from './ui/dealWizard.js';
 import { renderDealDetail } from './ui/dealDetail.js';
 import { renderSettings } from './ui/settings.js';
 import { renderNotifications } from './ui/notifications.js';
+import { renderDealsList } from './ui/dealsList.js';
+import { renderAccount } from './ui/account.js';
 import { Navbar, showToast } from './ui/components.js';
 import { doc, setDoc, serverTimestamp, getDoc } from './firebase.js';
 import { acceptInvite } from './api.js';
 
-// Make Firebase instances globally available
+// Make Firebase instances and state globally available
 window.auth = auth;
 window.db = db;
 window.firebaseFunctions = functions;
 window.store = store;
+window.firebaseReady = firebaseReady;
+window.firebaseError = firebaseError;
 
-// Initialize auth state
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    store.setState({ user });
-    
-    // Create/update user document
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userRef);
-      
-      if (!userDoc.exists()) {
-        await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || '',
-          theme: store.state.theme,
-          emailNotifications: true,
-          pushNotifications: true,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-      }
-    } catch (error) {
-      console.error('Error creating user document:', error);
-    }
-  } else {
-    store.setState({ user: null });
-  }
+// Show Firebase configuration banner if not ready
+function showFirebaseConfigBanner() {
+  if (firebaseReady) return '';
   
-  // Trigger initial route
-  router.handleRoute();
-});
+  return `
+    <div class="bg-gold-400 border-l-4 border-gold-600 text-navy-900 p-4 mb-4" role="alert">
+      <div class="flex items-start">
+        <div class="flex-shrink-0 text-2xl mr-3">⚠️</div>
+        <div class="flex-1">
+          <p class="font-bold">Firebase Configuration Required</p>
+          <p class="text-sm mt-1">
+            ${firebaseError || 'Firebase is not configured. Authentication and deal features are unavailable.'}
+          </p>
+          <p class="text-sm mt-2">
+            <a href="https://github.com/ataymia/MoneyGood/blob/main/FIREBASE_CONFIG.md" target="_blank" class="underline font-semibold">
+              View Setup Instructions →
+            </a>
+          </p>
+        </div>
+        <button onclick="this.parentElement.parentElement.remove()" class="flex-shrink-0 text-navy-900 hover:text-navy-700 text-xl ml-3">
+          ×
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// Initialize auth state (only if Firebase is ready)
+if (firebaseReady && auth) {
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      store.setState({ user });
+      
+      // Create/update user document
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userRef);
+        
+        if (!userDoc.exists()) {
+          await setDoc(userRef, {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName || '',
+            theme: store.state.theme,
+            emailNotifications: true,
+            pushNotifications: true,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+        }
+      } catch (error) {
+        console.error('Error creating user document:', error);
+      }
+    } else {
+      store.setState({ user: null });
+    }
+    
+    // Trigger initial route
+    router.handleRoute();
+  });
+} else {
+  // Firebase not ready, still render the app but without auth
+  console.warn('Firebase not ready - app will run in limited mode');
+  store.setState({ user: null });
+  // Trigger initial route after a short delay to let DOM load
+  setTimeout(() => router.handleRoute(), 100);
+}
 
 // Register routes
 router.register('/', renderLanding, false);
 router.register('/login', renderLogin, false);
 router.register('/signup', renderSignup, false);
 router.register('/app', renderDashboard, true);
+router.register('/deals', renderDealsList, true);
 router.register('/deal/new', renderDealWizard, true);
 router.register('/deal/:id', renderDealDetail, true);
 router.register('/join/:token', renderJoinDeal, false);
-router.register('/settings', renderSettings, true);
 router.register('/notifications', renderNotifications, true);
+router.register('/settings', renderSettings, true);
+router.register('/account', renderAccount, true);
 
 // Landing page
 function renderLanding() {
@@ -73,6 +114,9 @@ function renderLanding() {
   const content = document.getElementById('content');
   content.innerHTML = `
     ${Navbar({ user: null })}
+    <div class="container mx-auto px-4 pt-4">
+      ${showFirebaseConfigBanner()}
+    </div>
     <div class="min-h-screen bg-gradient-to-br from-emerald-50 via-navy-50 to-gold-50 dark:from-navy-900 dark:via-navy-800 dark:to-navy-900">
       <!-- Hero Section -->
       <section class="container mx-auto px-4 py-20">
