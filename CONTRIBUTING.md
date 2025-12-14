@@ -3,7 +3,7 @@
 Thank you for your interest in contributing to MoneyGood! This document provides guidelines and instructions for contributing.
 
 ## Code of Conduct
-
+ 
 Be respectful, constructive, and professional in all interactions.
 
 ## Development Setup
