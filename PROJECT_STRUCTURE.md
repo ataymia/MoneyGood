@@ -17,12 +17,12 @@ MoneyGood/
 ├── index.html                     # Main HTML entry point (in root for Cloudflare Pages)
 ├── styles.css                     # Custom CSS + theme variables
 ├── app.js                         # Main app initialization & routing
-├── router.js                      # Hash-based SPA router
+├── router.js                      # Hash-based SPA router (uses hash routing, no server redirects needed)
 ├── firebase.js                    # Firebase SDK initialization
 ├── api.js                         # Cloud Functions API wrapper
 ├── store.js                       # State management + localStorage
 ├── _headers                       # Cloudflare Pages headers configuration
-├── _redirects                     # Cloudflare Pages redirects configuration
+├── _routes.json                   # Cloudflare Pages routing config (static asset exclusion)
 │
 ├── ui/                            # UI Module Files
 │   ├── components.js              # Reusable components (Button, Card, Modal, Toast, etc.)
