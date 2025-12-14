@@ -1,4 +1,5 @@
-import { auth, db, functions, onAuthStateChanged, signOut, firebaseReady, firebaseError } from './firebase.js';
+// Use mock Firebase for demo mode - switch back to './firebase.js' when ready
+import { auth, db, functions, onAuthStateChanged, signOut, firebaseReady, firebaseError } from './firebase-mock.js';
 import { router } from './router.js';
 import { store } from './store.js';
 import { renderLogin, renderSignup } from './ui/auth.js';
@@ -10,7 +11,7 @@ import { renderNotifications } from './ui/notifications.js';
 import { renderDealsList } from './ui/dealsList.js';
 import { renderAccount } from './ui/account.js';
 import { Navbar, showToast } from './ui/components.js';
-import { doc, setDoc, serverTimestamp, getDoc } from './firebase.js';
+import { doc, setDoc, serverTimestamp, getDoc } from './firebase-mock.js';
 import { acceptInvite } from './api.js';
 
 // Make Firebase instances and state globally available
@@ -20,6 +21,29 @@ window.firebaseFunctions = functions;
 window.store = store;
 window.firebaseReady = firebaseReady;
 window.firebaseError = firebaseError;
+
+// Show demo mode banner
+function showDemoModeBanner() {
+  return `
+    <div class="bg-emerald-100 border-l-4 border-emerald-600 text-emerald-900 p-4 mb-4" role="alert">
+      <div class="flex items-start">
+        <div class="flex-shrink-0 text-2xl mr-3">🎭</div>
+        <div class="flex-1">
+          <p class="font-bold">Demo Mode Active</p>
+          <p class="text-sm mt-1">
+            You're viewing MoneyGood with mock data. All features are functional but no real transactions occur.
+          </p>
+          <p class="text-sm mt-2">
+            <strong>Demo credentials:</strong> Any email/password combination will work for login/signup.
+          </p>
+        </div>
+        <button onclick="this.parentElement.parentElement.remove()" class="flex-shrink-0 text-emerald-900 hover:text-emerald-700 text-xl ml-3">
+          ×
+        </button>
+      </div>
+    </div>
+  `;
+}
 
 // Show Firebase configuration banner if not ready
 function showFirebaseConfigBanner() {
@@ -115,7 +139,7 @@ function renderLanding() {
   content.innerHTML = `
     ${Navbar({ user: null })}
     <div class="container mx-auto px-4 pt-4">
-      ${showFirebaseConfigBanner()}
+      ${showDemoModeBanner()}
     </div>
     <div class="min-h-screen bg-gradient-to-br from-emerald-50 via-navy-50 to-gold-50 dark:from-navy-900 dark:via-navy-800 dark:to-navy-900">
       <!-- Hero Section -->

@@ -1,4 +1,5 @@
-import { doc, getDoc, setDoc, updateDoc } from '../firebase.js';
+// Use mock Firebase for demo mode - switch back to '../firebase.js' when ready
+import { doc, getDoc, setDoc, updateDoc } from '../firebase-mock.js';
 import { Navbar, Card, Select, showToast } from './components.js';
 import { renderSidebar, renderMobileNav } from './navigation.js';
 import { setupStripeConnect } from '../api.js';

@@ -1,4 +1,5 @@
-import { collection, query, where, orderBy, getDocs, onSnapshot } from '../firebase.js';
+// Use mock Firebase for demo mode - switch back to '../firebase.js' when ready
+import { collection, query, where, orderBy, getDocs, onSnapshot } from '../firebase-mock.js';
 import { Navbar, Card, formatCurrency, formatDate, showToast, Spinner } from './components.js';
 import { renderSidebar, renderMobileNav } from './navigation.js';
 import { router } from '../router.js';
