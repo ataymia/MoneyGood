@@ -15,12 +15,14 @@ export async function renderDealDetail(params) {
   
   const content = document.getElementById('content');
   content.innerHTML = `
-    ${Navbar({ user })}
-    <div class="min-h-screen bg-gradient-to-br from-emerald-50 to-navy-50 dark:from-navy-900 dark:to-navy-800 py-8">
-      <div class="container mx-auto px-4">
-        <div id="deal-container" class="max-w-5xl mx-auto">
-          <div class="flex items-center justify-center py-12">
-            ${Spinner({ size: 'lg' })}
+    <div class="flex flex-col h-screen bg-navy-50 dark:bg-navy-900">
+      ${Navbar({ user })}
+      <div class="flex-1 overflow-y-auto py-8">
+        <div class="container mx-auto px-4">
+          <div id="deal-container" class="max-w-5xl mx-auto">
+            <div class="flex items-center justify-center py-12">
+              ${Spinner({ size: 'lg' })}
+            </div>
           </div>
         </div>
       </div>
