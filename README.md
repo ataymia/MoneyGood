@@ -100,10 +100,11 @@ A production-ready static web application for secure two-party deals with collat
 
 ## Deployment Options
 
-MoneyGood supports two deployment options:
+MoneyGood supports three deployment options:
 
 1. **Cloudflare Pages** (recommended) - Frontend on Cloudflare, backend on Firebase
-2. **Firebase Hosting** - Full-stack Firebase deployment
+2. **GitHub Pages** - Frontend on GitHub Pages, backend on Firebase
+3. **Firebase Hosting** - Full-stack Firebase deployment
 
 ### Option 1: Cloudflare Pages Deployment (Recommended)
 
@@ -116,7 +117,22 @@ See **[CLOUDFLARE_DEPLOYMENT.md](./CLOUDFLARE_DEPLOYMENT.md)** for complete step
 - Free SSL certificates
 - Fast deployment times
 
-### Option 2: Firebase Hosting Deployment
+### Option 2: GitHub Pages Deployment
+
+GitHub Pages deployment is automatically configured via GitHub Actions. When you push to the `main` branch, the site is automatically deployed from the `public/` directory.
+
+**Quick Setup:**
+1. Go to your repository → Settings → Pages
+2. Under "Source", select "GitHub Actions"
+3. Push to `main` branch to trigger deployment
+4. Your site will be live at `https://yourusername.github.io/MoneyGood/`
+
+**Important:** You still need to:
+- Configure Firebase backend (Auth, Firestore, Functions)
+- Update `public/firebase.js` with your Firebase credentials
+- Add your GitHub Pages domain to Firebase authorized domains
+
+### Option 3: Firebase Hosting Deployment
 
 See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for Firebase Hosting instructions.
 
