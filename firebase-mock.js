@@ -226,11 +226,17 @@ export async function getDocs(queryRef) {
     exists: () => true
   }));
   
-  return {
+  // Make the snapshot iterable with forEach
+  const snapshot = {
     docs,
     empty: docs.length === 0,
-    size: docs.length
+    size: docs.length,
+    forEach: function(callback) {
+      docs.forEach(callback);
+    }
   };
+  
+  return snapshot;
 }
 
 export async function setDoc(docRef, data) {

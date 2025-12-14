@@ -408,5 +408,3 @@ window.showDeleteAccountModal = () => {
     });
   }, 100);
 };
-
-function renderMobileNav(user) {
