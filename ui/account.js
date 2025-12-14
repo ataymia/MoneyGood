@@ -2,8 +2,12 @@ import { Navbar, Card, Input, showToast, showModal } from './components.js';
 import { renderSidebar, renderMobileNav } from './navigation.js';
 import { router } from '../router.js';
 import { store } from '../store.js';
-import { auth, db, doc, getDoc, updateDoc, signOut } from '../firebase.js';
-import { updateProfile, updatePassword, deleteUser } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+// Use mock Firebase for demo mode - switch back to '../firebase.js' when ready
+import { auth, db, doc, getDoc, updateDoc, signOut } from '../firebase-mock.js';
+// Mock these Firebase auth functions for demo mode
+const updateProfile = async (user, data) => { console.log('Mock updateProfile:', data); };
+const updatePassword = async (user, password) => { console.log('Mock updatePassword'); };
+const deleteUser = async (user) => { console.log('Mock deleteUser'); };
 
 export async function renderAccount() {
   const { user } = store.getState();

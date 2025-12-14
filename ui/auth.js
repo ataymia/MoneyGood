@@ -1,7 +1,8 @@
+// Use mock Firebase for demo mode - switch back to '../firebase.js' when ready
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword 
-} from '../firebase.js';
+} from '../firebase-mock.js';
 import { Navbar, Input, showToast } from './components.js';
 import { router } from '../router.js';
 

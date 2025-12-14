@@ -1,4 +1,5 @@
-import { auth, db, functions, onAuthStateChanged, signOut, firebaseReady, firebaseError } from './firebase.js';
+// Use mock Firebase for demo mode - switch back to './firebase.js' when ready
+import { auth, db, functions, onAuthStateChanged, signOut, firebaseReady, firebaseError } from './firebase-mock.js';
 import { router } from './router.js';
 import { store } from './store.js';
 import { renderLogin, renderSignup } from './ui/auth.js';
@@ -10,7 +11,7 @@ import { renderNotifications } from './ui/notifications.js';
 import { renderDealsList } from './ui/dealsList.js';
 import { renderAccount } from './ui/account.js';
 import { Navbar, showToast } from './ui/components.js';
-import { doc, setDoc, serverTimestamp, getDoc } from './firebase.js';
+import { doc, setDoc, serverTimestamp, getDoc } from './firebase-mock.js';
 import { acceptInvite } from './api.js';
 
 // Make Firebase instances and state globally available

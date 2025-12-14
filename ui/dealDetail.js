@@ -1,4 +1,5 @@
-import { doc, getDoc, collection, query, orderBy, getDocs } from '../firebase.js';
+// Use mock Firebase for demo mode - switch back to '../firebase.js' when ready
+import { doc, getDoc, collection, query, orderBy, getDocs } from '../firebase-mock.js';
 import { Navbar, Card, formatCurrency, formatDate, showToast, showModal, Spinner } from './components.js';
 import { 
   createCheckoutSession, 

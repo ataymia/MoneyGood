@@ -1,4 +1,5 @@
-import { httpsCallable } from './firebase.js';
+// Use mock Firebase for demo mode - switch back to './firebase.js' when ready
+import { httpsCallable } from './firebase-mock.js';
 
 // Cloud Functions API wrapper 
 

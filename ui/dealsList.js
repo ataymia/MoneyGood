@@ -2,7 +2,8 @@ import { Navbar, Card, Spinner, showToast, formatCurrency, formatRelativeTime } 
 import { renderSidebar, renderMobileNav } from './navigation.js';
 import { router } from '../router.js';
 import { store } from '../store.js';
-import { db, collection, query, where, orderBy, getDocs } from '../firebase.js';
+// Use mock Firebase for demo mode - switch back to '../firebase.js' when ready
+import { db, collection, query, where, orderBy, getDocs } from '../firebase-mock.js';
 
 export async function renderDealsList() {
   const { user } = store.getState();
