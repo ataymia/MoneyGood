@@ -217,7 +217,7 @@ export function showToast(message, type = 'info', duration = 3000) {
   Toast({ message, type, duration });
 }
 
-export function Spinner({ size = 'md', className = '' }) {
+export function Spinner({ size = 'md', className = '' } = {}) {
   const sizes = {
     sm: 'w-4 h-4',
     md: 'w-6 h-6',
@@ -309,7 +309,7 @@ export function formatRelativeTime(dateString) {
   return 'Just now';
 }
 
-export function LoadingSpinner({ size = 'md', className = '' }) {
+export function LoadingSpinner({ size = 'md', className = '' } = {}) {
   const sizes = {
     sm: 'w-4 h-4',
     md: 'w-8 h-8',

@@ -6,7 +6,11 @@ const demoUser = {
   uid: 'demo-user-123',
   email: 'demo@moneygood.app',
   displayName: 'Demo User',
-  emailVerified: true
+  emailVerified: true,
+  metadata: {
+    creationTime: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+    lastSignInTime: new Date().toISOString()
+  }
 };
 
 // Mock auth state
@@ -50,6 +54,15 @@ export async function signOut(auth) {
   authStateListeners.forEach(cb => cb(null));
 }
 
+// Helper to convert Date to Firestore timestamp format
+function toTimestamp(date) {
+  return {
+    seconds: Math.floor(date.getTime() / 1000),
+    nanoseconds: (date.getTime() % 1000) * 1000000,
+    toDate: () => date
+  };
+}
+
 // Mock Firestore
 const mockData = {
   users: {
@@ -60,8 +73,8 @@ const mockData = {
       theme: 'light',
       emailNotifications: true,
       pushNotifications: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: toTimestamp(new Date()),
+      updatedAt: toTimestamp(new Date())
     }
   },
   deals: {
@@ -69,13 +82,19 @@ const mockData = {
       id: 'deal-1',
       title: 'Website Development Project',
       description: 'Build a responsive e-commerce website with payment integration',
+      type: 'both',
       dealType: 'both',
       dealAmount: 5000,
       goodsDescription: 'Complete website with admin panel',
       fairnessHoldAmount: 500,
-      dealDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      dealDate: toTimestamp(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
       status: 'active',
       createdBy: 'demo-user-123',
+      creatorUid: 'demo-user-123',
+      creatorEmail: 'demo@moneygood.app',
+      participantUid: 'partner-456',
+      participantEmail: 'partner@example.com',
+      participants: ['demo-user-123', 'partner-456'],
       partyA: {
         userId: 'demo-user-123',
         email: 'demo@moneygood.app',
@@ -93,19 +112,25 @@ const mockData = {
         fairnessHoldPaid: true
       },
       frozen: false,
-      createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date()
+      createdAt: toTimestamp(new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)),
+      updatedAt: toTimestamp(new Date())
     },
     'deal-2': {
       id: 'deal-2',
-      title: 'Laptop Purchase',
-      description: 'MacBook Pro 16" with M3 chip',
+      title: 'Laptop Purchase Agreement',
+      description: 'MacBook Pro 16" with M3 chip - verified seller with escrow protection',
+      type: 'goods',
       dealType: 'goods',
-      goodsDescription: 'MacBook Pro 16", Space Gray, 32GB RAM, 1TB SSD',
+      goodsDescription: 'MacBook Pro 16", Space Gray, 32GB RAM, 1TB SSD, AppleCare+ included',
       fairnessHoldAmount: 300,
-      dealDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      dealDate: toTimestamp(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
       status: 'pending_funding',
       createdBy: 'demo-user-123',
+      creatorUid: 'demo-user-123',
+      creatorEmail: 'demo@moneygood.app',
+      participantUid: 'seller-789',
+      participantEmail: 'seller@example.com',
+      participants: ['demo-user-123', 'seller-789'],
       partyA: {
         userId: 'demo-user-123',
         email: 'demo@moneygood.app',
@@ -123,19 +148,25 @@ const mockData = {
         fairnessHoldPaid: false
       },
       frozen: false,
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date()
+      createdAt: toTimestamp(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)),
+      updatedAt: toTimestamp(new Date())
     },
     'deal-3': {
       id: 'deal-3',
-      title: 'Consulting Services',
-      description: 'Business strategy consultation - 10 hours',
+      title: 'Business Strategy Consultation',
+      description: 'Comprehensive business strategy consultation - 10 hours of expert analysis',
+      type: 'cash',
       dealType: 'cash',
       dealAmount: 2000,
       fairnessHoldAmount: 200,
-      dealDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      dealDate: toTimestamp(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
       status: 'completed',
       createdBy: 'consultant-321',
+      creatorUid: 'consultant-321',
+      creatorEmail: 'consultant@example.com',
+      participantUid: 'demo-user-123',
+      participantEmail: 'demo@moneygood.app',
+      participants: ['consultant-321', 'demo-user-123'],
       partyA: {
         userId: 'demo-user-123',
         email: 'demo@moneygood.app',
@@ -147,16 +178,88 @@ const mockData = {
       partyB: {
         userId: 'consultant-321',
         email: 'consultant@example.com',
-        displayName: 'Consultant',
+        displayName: 'Expert Consultant',
         role: 'seller',
         setupFeePaid: true,
         fairnessHoldPaid: true
       },
       outcome: 'success',
       frozen: false,
-      completedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-      updatedAt: new Date()
+      completedAt: toTimestamp(new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)),
+      createdAt: toTimestamp(new Date(Date.now() - 20 * 24 * 60 * 60 * 1000)),
+      updatedAt: toTimestamp(new Date())
+    },
+    'deal-4': {
+      id: 'deal-4',
+      title: 'Freelance Web Design Package',
+      description: 'Custom website design with 3 revision rounds and source files',
+      type: 'cash',
+      dealType: 'cash',
+      dealAmount: 1500,
+      fairnessHoldAmount: 150,
+      dealDate: toTimestamp(new Date(Date.now() + 21 * 24 * 60 * 60 * 1000)),
+      status: 'active',
+      createdBy: 'designer-555',
+      creatorUid: 'designer-555',
+      creatorEmail: 'designer@creative.com',
+      participantUid: 'demo-user-123',
+      participantEmail: 'demo@moneygood.app',
+      participants: ['designer-555', 'demo-user-123'],
+      partyA: {
+        userId: 'designer-555',
+        email: 'designer@creative.com',
+        displayName: 'Creative Designer',
+        role: 'seller',
+        setupFeePaid: true,
+        fairnessHoldPaid: true
+      },
+      partyB: {
+        userId: 'demo-user-123',
+        email: 'demo@moneygood.app',
+        displayName: 'Demo User',
+        role: 'buyer',
+        setupFeePaid: true,
+        fairnessHoldPaid: true
+      },
+      frozen: false,
+      createdAt: toTimestamp(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)),
+      updatedAt: toTimestamp(new Date())
+    },
+    'deal-5': {
+      id: 'deal-5',
+      title: 'Gaming PC Components Bundle',
+      description: 'RTX 4080, AMD Ryzen 9, 32GB RAM, 2TB NVMe - brand new sealed',
+      type: 'goods',
+      dealType: 'goods',
+      goodsDescription: 'Complete gaming PC components: NVIDIA RTX 4080, AMD Ryzen 9 7950X, 32GB DDR5 RAM, 2TB Gen4 NVMe SSD',
+      fairnessHoldAmount: 400,
+      dealDate: toTimestamp(new Date(Date.now() + 10 * 24 * 60 * 60 * 1000)),
+      status: 'active',
+      createdBy: 'demo-user-123',
+      creatorUid: 'demo-user-123',
+      creatorEmail: 'demo@moneygood.app',
+      participantUid: 'gamer-999',
+      participantEmail: 'gamer@pcbuild.com',
+      participants: ['demo-user-123', 'gamer-999'],
+      partyA: {
+        userId: 'demo-user-123',
+        email: 'demo@moneygood.app',
+        displayName: 'Demo User',
+        role: 'seller',
+        setupFeePaid: true,
+        fairnessHoldPaid: true
+      },
+      partyB: {
+        userId: 'gamer-999',
+        email: 'gamer@pcbuild.com',
+        displayName: 'PC Enthusiast',
+        role: 'buyer',
+        setupFeePaid: true,
+        fairnessHoldPaid: true
+      },
+      frozen: false,
+      createdAt: toTimestamp(new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)),
+      updatedAt: toTimestamp(new Date())
     }
   },
   notifications: {
@@ -168,27 +271,47 @@ const mockData = {
       message: 'Partner User has paid their setup fee and fairness hold',
       dealId: 'deal-1',
       read: false,
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
+      createdAt: toTimestamp(new Date(Date.now() - 2 * 60 * 60 * 1000))
     },
     'notif-2': {
       id: 'notif-2',
       userId: 'demo-user-123',
       type: 'deal_reminder',
       title: 'Deal Due Soon',
-      message: 'Your deal "Laptop Purchase" is due in 7 days',
+      message: 'Your deal "Laptop Purchase Agreement" is due in 7 days',
       dealId: 'deal-2',
       read: false,
-      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000)
+      createdAt: toTimestamp(new Date(Date.now() - 24 * 60 * 60 * 1000))
     },
     'notif-3': {
       id: 'notif-3',
       userId: 'demo-user-123',
       type: 'deal_completed',
-      title: 'Deal Completed',
-      message: 'Your deal "Consulting Services" has been completed successfully',
+      title: 'Deal Completed Successfully',
+      message: 'Your deal "Business Strategy Consultation" has been completed successfully',
       dealId: 'deal-3',
       read: true,
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+      createdAt: toTimestamp(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000))
+    },
+    'notif-4': {
+      id: 'notif-4',
+      userId: 'demo-user-123',
+      type: 'deal_action',
+      title: 'New Deal Invitation',
+      message: 'Creative Designer invited you to join "Freelance Web Design Package"',
+      dealId: 'deal-4',
+      read: false,
+      createdAt: toTimestamp(new Date(Date.now() - 3 * 24 * 60 * 60 * 1000))
+    },
+    'notif-5': {
+      id: 'notif-5',
+      userId: 'demo-user-123',
+      type: 'deal_reminder',
+      title: 'Deal Starts Soon',
+      message: 'Your deal "Gaming PC Components Bundle" starts in 3 days',
+      dealId: 'deal-5',
+      read: false,
+      createdAt: toTimestamp(new Date(Date.now() - 12 * 60 * 60 * 1000))
     }
   }
 };
@@ -198,8 +321,14 @@ export const db = {
   doc: () => ({ /* mock doc */ })
 };
 
-export function collection(db, collectionName) {
-  return { _collectionName: collectionName };
+export function collection(db, ...pathSegments) {
+  // Handle both collection(db, 'collectionName') and collection(db, 'parent', 'id', 'subcollection')
+  if (pathSegments.length === 1) {
+    return { _collectionName: pathSegments[0], _path: pathSegments };
+  } else {
+    // For subcollections like collection(db, 'users', userId, 'notifications')
+    return { _collectionName: pathSegments[pathSegments.length - 1], _path: pathSegments, _isSubcollection: true };
+  }
 }
 
 export function doc(db, ...pathSegments) {
@@ -218,9 +347,79 @@ export async function getDoc(docRef) {
 
 export async function getDocs(queryRef) {
   const collectionName = queryRef._collectionName || queryRef._query?._collectionName;
-  const collectionData = mockData[collectionName] || {};
+  const collectionPath = queryRef._path || queryRef._query?._path || [];
+  const constraints = queryRef._constraints || [];
   
-  const docs = Object.entries(collectionData).map(([id, data]) => ({
+  let collectionData = {};
+  
+  // Handle subcollections
+  if (collectionPath.length > 1 && queryRef._isSubcollection) {
+    // For subcollections like ['users', 'demo-user-123', 'notifications']
+    // Check if we have notifications for this user
+    if (collectionPath[0] === 'users' && collectionPath[2] === 'notifications') {
+      const userId = collectionPath[1];
+      // Filter notifications by userId
+      const allNotifications = mockData.notifications || {};
+      collectionData = Object.fromEntries(
+        Object.entries(allNotifications).filter(([id, notif]) => notif.userId === userId)
+      );
+    }
+  } else {
+    // Regular top-level collection
+    collectionData = mockData[collectionName] || {};
+  }
+  
+  // Filter data based on where clauses
+  let filteredEntries = Object.entries(collectionData);
+  
+  constraints.forEach(constraint => {
+    if (constraint._type === 'where') {
+      const { field, operator, value } = constraint;
+      filteredEntries = filteredEntries.filter(([id, data]) => {
+        const fieldValue = data[field];
+        switch (operator) {
+          case '==':
+            return fieldValue === value;
+          case '!=':
+            return fieldValue !== value;
+          case '>':
+            return fieldValue > value;
+          case '>=':
+            return fieldValue >= value;
+          case '<':
+            return fieldValue < value;
+          case '<=':
+            return fieldValue <= value;
+          case 'array-contains':
+            return Array.isArray(fieldValue) && fieldValue.includes(value);
+          default:
+            return true;
+        }
+      });
+    }
+  });
+  
+  // Sort data based on orderBy clauses
+  constraints.forEach(constraint => {
+    if (constraint._type === 'orderBy') {
+      const { field, direction } = constraint;
+      filteredEntries.sort(([aId, aData], [bId, bData]) => {
+        const aValue = aData[field];
+        const bValue = bData[field];
+        
+        // Handle timestamp objects
+        const aTime = aValue?.seconds || aValue?.getTime?.() / 1000 || 0;
+        const bTime = bValue?.seconds || bValue?.getTime?.() / 1000 || 0;
+        
+        if (direction === 'desc') {
+          return bTime - aTime;
+        }
+        return aTime - bTime;
+      });
+    }
+  });
+  
+  const docs = filteredEntries.map(([id, data]) => ({
     id,
     data: () => data,
     exists: () => true
@@ -274,6 +473,8 @@ export function query(collectionRef, ...constraints) {
   return { 
     _query: collectionRef,
     _collectionName: collectionRef._collectionName,
+    _path: collectionRef._path,
+    _isSubcollection: collectionRef._isSubcollection,
     _constraints: constraints 
   };
 }
@@ -286,12 +487,63 @@ export function orderBy(field, direction = 'asc') {
   return { _type: 'orderBy', field, direction };
 }
 
-export function onSnapshot(queryRef, callback) {
+export function onSnapshot(queryRef, callback, errorCallback) {
   // Immediately call with current data
   const collectionName = queryRef._collectionName || queryRef._query?._collectionName || queryRef._path?.[0];
-  const collectionData = mockData[collectionName] || {};
+  const collectionPath = queryRef._path || queryRef._query?._path || [];
+  const constraints = queryRef._constraints || [];
   
-  const docs = Object.entries(collectionData).map(([id, data]) => ({
+  let collectionData = {};
+  
+  // Handle subcollections
+  if (collectionPath.length > 1 && queryRef._isSubcollection) {
+    // For subcollections like ['users', 'demo-user-123', 'notifications']
+    if (collectionPath[0] === 'users' && collectionPath[2] === 'notifications') {
+      const userId = collectionPath[1];
+      // Filter notifications by userId
+      const allNotifications = mockData.notifications || {};
+      collectionData = Object.fromEntries(
+        Object.entries(allNotifications).filter(([id, notif]) => notif.userId === userId)
+      );
+    }
+  } else {
+    collectionData = mockData[collectionName] || {};
+  }
+  
+  // Apply constraints
+  let filteredEntries = Object.entries(collectionData);
+  
+  constraints.forEach(constraint => {
+    if (constraint._type === 'where') {
+      const { field, operator, value } = constraint;
+      filteredEntries = filteredEntries.filter(([id, data]) => {
+        const fieldValue = data[field];
+        switch (operator) {
+          case '==':
+            return fieldValue === value;
+          case 'array-contains':
+            return Array.isArray(fieldValue) && fieldValue.includes(value);
+          default:
+            return true;
+        }
+      });
+    } else if (constraint._type === 'orderBy') {
+      const { field, direction } = constraint;
+      filteredEntries.sort(([aId, aData], [bId, bData]) => {
+        const aValue = aData[field];
+        const bValue = bData[field];
+        const aTime = aValue?.seconds || aValue?.getTime?.() / 1000 || 0;
+        const bTime = bValue?.seconds || bValue?.getTime?.() / 1000 || 0;
+        
+        if (direction === 'desc') {
+          return bTime - aTime;
+        }
+        return aTime - bTime;
+      });
+    }
+  });
+  
+  const docs = filteredEntries.map(([id, data]) => ({
     id,
     data: () => data,
     exists: () => true
@@ -301,7 +553,10 @@ export function onSnapshot(queryRef, callback) {
     callback({
       docs,
       empty: docs.length === 0,
-      size: docs.length
+      size: docs.length,
+      forEach: function(cb) {
+        docs.forEach(cb);
+      }
     });
   }, 100);
   
