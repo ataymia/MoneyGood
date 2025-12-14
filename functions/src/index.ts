@@ -12,22 +12,19 @@ import {
   ApproveExtensionSchema,
 } from './validators';
 import {
-  stripe,
-  createCheckoutSession,
+  createCheckoutSession as stripeCreateCheckoutSession,
   createConnectAccount,
   createAccountLink,
-  createTransfer,
-  createRefund,
   constructWebhookEvent,
 } from './stripe';
 import {
   calculateSetupFee,
   calculateFairnessHold,
-  getNextStatus,
   isDealPastDue,
   calculateExtensionFee,
   getExtensionDays,
 } from './dealMachine';
+// Notifications available in './notifications' module if needed
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -264,7 +261,7 @@ export const createCheckoutSession = functions.https.onCall(async (data, context
   const successUrl = `${process.env.APP_URL || 'http://localhost:5000'}/#/deal/${validated.dealId}?payment=success`;
   const cancelUrl = `${process.env.APP_URL || 'http://localhost:5000'}/#/deal/${validated.dealId}?payment=cancelled`;
 
-  const session = await createCheckoutSession(
+  const session = await stripeCreateCheckoutSession(
     amountCents,
     'usd',
     validated.dealId,
@@ -742,7 +739,7 @@ export const setupStripeConnect = functions.https.onCall(async (data, context) =
     stripeAccountId = account.id;
 
     await db.collection('users').doc(userId).update({
-      stripeConnectAccountId,
+      stripeConnectAccountId: stripeAccountId,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   }
@@ -799,7 +796,6 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
 
         // Update deal payment status
         const dealDoc = await db.collection('deals').doc(dealId).get();
-        const deal = dealDoc.data()!;
 
         const isCreator = payment.party === 'A';
         const statusField = isCreator ? 'creatorPaymentStatus' : 'participantPaymentStatus';

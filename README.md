@@ -1,6 +1,6 @@
 # MoneyGood 💰
 
-A production-ready static web application for secure two-party deals with collateral, Stripe payments, and dispute resolution. Built with Firebase (Auth, Firestore, Cloud Functions, Hosting) and vanilla JavaScript.
+A production-ready static web application for secure two-party deals with collateral, Stripe payments, and dispute resolution. Frontend deployed on **Cloudflare Pages**, backend powered by **Firebase** (Auth, Firestore, Cloud Functions) with **Stripe + Stripe Connect** integration. Built with vanilla JavaScript ES modules.
 
 ## Features
 
@@ -89,77 +89,151 @@ A production-ready static web application for secure two-party deals with collat
         └── dealMachine.ts     # Deal state machine logic
 ```
 
-## Setup Instructions
+## Quick Start
 
 ### Prerequisites
 - Node.js 20+
 - Firebase CLI: `npm install -g firebase-tools`
-- Stripe account
-- Firebase project
+- Stripe account (for payments)
+- Cloudflare account (for hosting frontend)
+- Firebase project (for backend)
 
-### 1. Firebase Project Setup
+## Deployment Options
+
+MoneyGood supports two deployment options:
+
+1. **Cloudflare Pages** (recommended) - Frontend on Cloudflare, backend on Firebase
+2. **Firebase Hosting** - Full-stack Firebase deployment
+
+### Option 1: Cloudflare Pages Deployment (Recommended)
+
+See **[CLOUDFLARE_DEPLOYMENT.md](./CLOUDFLARE_DEPLOYMENT.md)** for complete step-by-step instructions.
+
+**Why Cloudflare Pages?**
+- Unlimited bandwidth on free tier
+- Global CDN with 200+ locations
+- Better DDoS protection
+- Free SSL certificates
+- Fast deployment times
+
+### Option 2: Firebase Hosting Deployment
+
+See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for Firebase Hosting instructions.
+
+## Setup Instructions
+
+### 1. Clone and Install
 
 ```bash
+git clone https://github.com/ataymia/MoneyGood.git
+cd MoneyGood
+
+# Install Firebase CLI if not already installed
+npm install -g firebase-tools
+
 # Login to Firebase
 firebase login
+```
 
-# Create a new Firebase project (or use existing)
+### 2. Firebase Project Setup
+
+```bash
+# Create a new Firebase project or use existing
 firebase projects:create moneygood-app
 
-# Initialize Firebase in this directory
+# Set project for this directory
 firebase use moneygood-app
 ```
 
-### 2. Enable Firebase Services
+### 3. Enable Firebase Services
 
 In the [Firebase Console](https://console.firebase.google.com):
-1. **Authentication**: Enable Email/Password provider
-2. **Firestore**: Create database in production mode
-3. **Functions**: Upgrade to Blaze (pay-as-you-go) plan
-4. **Hosting**: Enable Firebase Hosting
 
-### 3. Configure Environment Variables
+1. **Authentication**:
+   - Go to Authentication → Sign-in method
+   - Enable **Email/Password** provider
 
-#### Frontend Configuration
-Update `public/firebase.js` with your Firebase config:
+2. **Firestore Database**:
+   - Go to Firestore Database
+   - Create database in **production mode**
+   - Choose a location (e.g., us-central1)
+
+3. **Upgrade to Blaze Plan**:
+   - Go to Project Settings → Usage and billing
+   - Upgrade to **Blaze (pay-as-you-go)** plan
+   - Required for Cloud Functions
+
+### 4. Configure Firebase Credentials
+
+#### Get Your Firebase Config
+
+1. Go to [Firebase Console](https://console.firebase.google.com)
+2. Select your project → Settings (gear icon) → Project Settings
+3. Scroll to "Your apps" → Click on Web app (or create one)
+4. Copy the `firebaseConfig` object
+
+#### Update Frontend Configuration
+
+Edit `public/firebase.js` and replace placeholder values:
 
 ```javascript
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "moneygood-app.firebaseapp.com",
-  projectId: "moneygood-app",
-  storageBucket: "moneygood-app.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSy...",  // ← Your actual API key
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abc123"
 };
 ```
 
-#### Backend Configuration
-Create `functions/.env` file:
+**⚠️ Important**: The placeholder values will show a configuration error page until replaced.
+
+### 5. Configure Stripe
+
+#### Create Stripe Account
+
+1. Sign up at [stripe.com](https://stripe.com)
+2. Go to Dashboard → Developers → API keys
+3. Copy your **Secret Key** (use test key `sk_test_...` for development)
+
+#### Enable Stripe Connect
+
+1. Go to Dashboard → Connect → Get started
+2. Complete Stripe Connect setup
+3. Note your Connect settings
+
+#### Create Backend Environment File
+
+Create `functions/.env`:
 
 ```env
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-APP_URL=https://moneygood-app.web.app
+STRIPE_SECRET_KEY=sk_test_your_test_key_here
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+APP_URL=https://your-site.pages.dev
 ```
 
-### 4. Install Dependencies
+**Note**: Use test keys for development, live keys for production.
+
+### 6. Deploy Firebase Backend
+
+#### Install Dependencies
 
 ```bash
-# Install Cloud Functions dependencies
 cd functions
 npm install
 cd ..
 ```
 
-### 5. Deploy Firestore Rules and Indexes
+#### Deploy Firestore Rules and Indexes
 
 ```bash
-firebase deploy --only firestore:rules
-firebase deploy --only firestore:indexes
+firebase deploy --only firestore:rules,firestore:indexes
 ```
 
-### 6. Build and Deploy Cloud Functions
+This sets up security rules and database indexes.
+
+#### Build and Deploy Cloud Functions
 
 ```bash
 cd functions
@@ -168,46 +242,134 @@ cd ..
 firebase deploy --only functions
 ```
 
-### 7. Deploy Frontend to Firebase Hosting
+**Note**: First deployment may take 5-10 minutes. Note the function URLs from the output.
+
+### 7. Configure Stripe Webhook
+
+After deploying functions, set up the Stripe webhook:
+
+1. Go to [Stripe Dashboard → Webhooks](https://dashboard.stripe.com/webhooks)
+2. Click **Add endpoint**
+3. Enter your Cloud Function URL:
+   ```
+   https://YOUR_REGION-YOUR_PROJECT.cloudfunctions.net/stripeWebhook
+   ```
+   (Find exact URL in Firebase Console → Functions → stripeWebhook)
+4. Select event to listen: `checkout.session.completed`
+5. Click **Add endpoint**
+6. Copy the **webhook signing secret** (starts with `whsec_`)
+7. Update `functions/.env` with the secret:
+   ```env
+   STRIPE_WEBHOOK_SECRET=whsec_your_actual_secret
+   ```
+8. Redeploy functions:
+   ```bash
+   firebase deploy --only functions
+   ```
+
+### 8. Deploy Frontend
+
+Choose one of the deployment options:
+
+#### Option A: Deploy to Cloudflare Pages (Recommended)
+
+See **[CLOUDFLARE_DEPLOYMENT.md](./CLOUDFLARE_DEPLOYMENT.md)** for detailed instructions.
+
+Quick steps:
+1. Push code to GitHub
+2. Go to [Cloudflare Dashboard → Pages](https://dash.cloudflare.com/)
+3. Click **Create a project** → **Connect to Git**
+4. Select your repository
+5. Configure build settings:
+   - **Build command**: Leave empty
+   - **Build output directory**: `public`
+6. Click **Save and Deploy**
+7. Your site will be live at: `https://your-project.pages.dev`
+
+**Don't forget**: Add your Cloudflare domain to Firebase Authentication authorized domains!
+
+#### Option B: Deploy to Firebase Hosting
 
 ```bash
 firebase deploy --only hosting
 ```
 
-### 8. Stripe Webhook Setup
+Your site will be live at: `https://your-project.web.app`
 
-1. In [Stripe Dashboard](https://dashboard.stripe.com/webhooks), create a new webhook
-2. Set endpoint URL: `https://YOUR_REGION-YOUR_PROJECT.cloudfunctions.net/stripeWebhook`
-3. Select events: `checkout.session.completed`
-4. Copy webhook secret to `functions/.env` as `STRIPE_WEBHOOK_SECRET`
+### 9. Test Your Deployment
 
-## Development
+1. Visit your hosted URL
+2. Create a test account
+3. Create a test deal
+4. Use [Stripe test cards](https://stripe.com/docs/testing):
+   - Success: `4242 4242 4242 4242`
+   - Decline: `4000 0000 0000 0002`
+   - Any future date for expiry, any 3 digits for CVC, any 5 digits for ZIP
 
-### Run Firebase Emulators
+## Local Development
+
+### Run With Firebase Emulators
+
+Best for testing the full stack locally:
 
 ```bash
-# Start emulators for Firestore, Functions, and Hosting
+# Start emulators for Auth, Firestore, and Functions
 firebase emulators:start
+
+# Access the app at:
+# - Frontend: http://localhost:5000
+# - Emulator UI: http://localhost:4000
 ```
 
-Access the app at `http://localhost:5000`
+### Run Frontend Only
 
-### Test Cloud Functions Locally
-
-```bash
-cd functions
-npm run serve
-```
-
-### Watch for Changes
-
-For frontend development, use any static file server:
+For quick frontend development:
 
 ```bash
 cd public
+
+# Option 1: Python
 python -m http.server 8000
-# or
+
+# Option 2: Node.js
 npx serve
+
+# Option 3: PHP
+php -S localhost:8000
+
+# Access at: http://localhost:8000
+```
+
+**Note**: When running frontend only, you'll need deployed Firebase Functions for backend operations.
+
+### Watch Cloud Functions
+
+For function development:
+
+```bash
+cd functions
+
+# Build and watch for changes
+npm run build -- --watch
+
+# Or use Firebase emulators
+cd ..
+firebase emulators:start --only functions
+```
+
+### Test Stripe Webhooks Locally
+
+Use Stripe CLI to forward webhook events:
+
+```bash
+# Install Stripe CLI: https://stripe.com/docs/stripe-cli
+stripe login
+
+# Forward events to local functions
+stripe listen --forward-to http://localhost:5001/YOUR_PROJECT/us-central1/stripeWebhook
+
+# Test with:
+stripe trigger checkout.session.completed
 ```
 
 ## Data Models
@@ -369,28 +531,171 @@ jobs:
 - View webhook delivery status
 - Track Connect account onboarding
 
+## Architecture
+
+### High-Level Overview
+
+```
+┌─────────────────────────────────────────────┐
+│         Cloudflare Pages / Firebase          │
+│              (Static Frontend)               │
+│  • HTML/CSS/JS (vanilla ES modules)         │
+│  • SPA with hash routing                    │
+│  • Real-time Firestore listeners            │
+└─────────────────┬───────────────────────────┘
+                  │
+                  ↓
+┌─────────────────────────────────────────────┐
+│           Firebase Services                  │
+│  ┌──────────────────────────────────────┐  │
+│  │  Authentication (Email/Password)      │  │
+│  └──────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────┐  │
+│  │  Firestore (NoSQL Database)          │  │
+│  │  • users/, deals/, payments/         │  │
+│  │  • Real-time sync                    │  │
+│  └──────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────┐  │
+│  │  Cloud Functions (Node 20)           │  │
+│  │  • Callable functions (API)          │  │
+│  │  • HTTP webhooks                     │  │
+│  │  • Scheduled functions (cron)        │  │
+│  └──────────────────────────────────────┘  │
+└─────────────────┬───────────────────────────┘
+                  │
+                  ↓
+┌─────────────────────────────────────────────┐
+│             Stripe Services                  │
+│  • Checkout (payments)                      │
+│  • Connect (payouts)                        │
+│  • Webhooks (events)                        │
+└─────────────────────────────────────────────┘
+```
+
+### Security Model
+
+**Frontend**: 
+- Public static assets (HTML/CSS/JS)
+- Firebase SDK for client-side Auth and Firestore reads
+- All sensitive writes go through Cloud Functions
+
+**Firestore Rules**:
+- Users can only read/write their own user document
+- Deals readable only by creator and participant
+- Status, payments, and sensitive fields server-controlled
+- Direct client writes to sensitive fields blocked
+
+**Cloud Functions**:
+- All functions require authentication
+- Zod schema validation on inputs
+- Permission checks for deal participation
+- State machine prevents invalid transitions
+
+### Data Flow Examples
+
+**Creating a Deal**:
+1. User fills form in frontend
+2. Frontend calls `createDeal()` Cloud Function
+3. Function validates data, calculates fees
+4. Function creates deal document in Firestore
+5. Function logs action and creates notification
+6. Frontend receives deal ID
+7. Firestore listener updates UI in real-time
+
+**Payment Processing**:
+1. User clicks "Pay" button
+2. Frontend calls `createCheckoutSession()` Cloud Function
+3. Function creates Stripe Checkout session
+4. Function stores payment record
+5. User redirected to Stripe Checkout
+6. User completes payment
+7. Stripe sends webhook to Cloud Function
+8. Function marks payment as succeeded
+9. Function updates deal status if fully funded
+10. Frontend real-time listeners update UI
+
 ## Troubleshooting
 
 ### Common Issues
 
-**Functions deployment fails**
+**Issue: Can't see the site / Configuration error page**
+
+**Symptoms**: Site loads but shows a configuration warning page
+
+**Solution**: You're using placeholder Firebase credentials. Update `public/firebase.js` with your actual Firebase config:
+
+1. Go to Firebase Console → Project Settings → Your apps → Web app
+2. Copy your Firebase configuration
+3. Replace placeholder values in `public/firebase.js`
+4. Redeploy your site
+
+**Issue: Functions deployment fails**
+
+**Solution**:
 ```bash
 # Ensure you're on Blaze plan
 firebase projects:list
 
+# Check for build errors
+cd functions
+npm run build
+
 # Check functions logs
 firebase functions:log
+
+# Deploy with debug
+firebase deploy --only functions --debug
 ```
 
-**Stripe webhook not receiving events**
-- Verify webhook URL matches deployed function
-- Check webhook secret in environment variables
-- Review Stripe webhook delivery logs
+**Issue: Stripe webhook not receiving events**
 
-**Firestore permission denied**
-- Check security rules are deployed
-- Verify user authentication status
-- Ensure user is participant in deal
+**Solution**:
+- Verify webhook URL matches deployed function URL
+- Check webhook secret in `functions/.env`
+- Review Stripe Dashboard → Webhooks → delivery logs
+- Test webhook signature validation
+- Ensure functions are deployed: `firebase deploy --only functions`
+
+**Issue: Firestore permission denied**
+
+**Solution**:
+- Check security rules are deployed: `firebase deploy --only firestore:rules`
+- Verify user is authenticated
+- Ensure user is creator or participant in the deal
+- Check browser console for detailed error messages
+
+**Issue: Authentication doesn't work on Cloudflare**
+
+**Solution**:
+1. Go to Firebase Console → Authentication → Settings → Authorized domains
+2. Add your Cloudflare Pages domain (e.g., `your-project.pages.dev`)
+3. If using custom domain, add that too
+4. Wait a few minutes for changes to propagate
+
+**Issue: Dark mode not working**
+
+**Solution**:
+- Check browser console for errors
+- Verify theme is saved in localStorage
+- Go to Settings and toggle theme manually
+- Clear browser cache and reload
+
+**Issue: Payments fail silently**
+
+**Solutions**:
+1. Check Stripe webhook is configured correctly
+2. Verify webhook secret in `functions/.env`
+3. Check Cloud Function logs: `firebase functions:log`
+4. Test with Stripe CLI: `stripe listen --forward-to YOUR_FUNCTION_URL`
+5. Verify Stripe keys are correct (test vs live)
+
+**Issue: Deal status not updating**
+
+**Solutions**:
+1. Check Cloud Functions logs for errors
+2. Verify Firestore security rules allow function writes
+3. Check browser console for Firestore listener errors
+4. Ensure deal funding is complete before expecting status changes
 
 ## License
 

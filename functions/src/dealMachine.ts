@@ -1,4 +1,5 @@
 // Deal state machine and business logic
+import { calculateSetupFee as calcSetupFee, calculateDealFees, EXTENSION_FEE_CENTS } from './fees';
 
 export type DealStatus = 
   | 'draft'
@@ -12,9 +13,10 @@ export type DealStatus =
 
 export type DealType = 'CASH_CASH' | 'CASH_GOODS' | 'GOODS_GOODS';
 
+// Re-export fee calculations for backward compatibility
+// dealType parameter kept for API compatibility but not used (fees are fixed)
 export function calculateSetupFee(dealType: DealType): number {
-  // Setup fee in cents
-  return 500; // $5.00 base fee
+  return calcSetupFee();
 }
 
 export function calculateFairnessHold(
@@ -22,15 +24,15 @@ export function calculateFairnessHold(
   declaredValueA?: number,
   declaredValueB?: number
 ): { fairnessHoldA: number; fairnessHoldB: number } {
-  if (dealType === 'CASH_CASH') {
-    return { fairnessHoldA: 0, fairnessHoldB: 0 };
-  }
-
-  // For goods/services, require 20% of declared value as collateral
-  const fairnessHoldA = declaredValueA ? Math.floor(declaredValueA * 0.2) : 0;
-  const fairnessHoldB = declaredValueB ? Math.floor(declaredValueB * 0.2) : 0;
-
-  return { fairnessHoldA, fairnessHoldB };
+  const fees = calculateDealFees({
+    dealType,
+    declaredValueA,
+    declaredValueB,
+  });
+  return {
+    fairnessHoldA: fees.fairnessHoldA,
+    fairnessHoldB: fees.fairnessHoldB,
+  };
 }
 
 export function canTransitionTo(currentStatus: DealStatus, newStatus: DealStatus): boolean {
@@ -89,8 +91,8 @@ export function isDealPastDue(dealDate: Date): boolean {
 }
 
 export function calculateExtensionFee(extensionType: 'standard' | 'extended'): number {
-  // Extension fees in cents
-  return extensionType === 'standard' ? 1000 : 2000; // $10 or $20
+  // Use standard extension fee from fees.ts
+  return EXTENSION_FEE_CENTS;
 }
 
 export function getExtensionDays(extensionType: 'standard' | 'extended'): number {
