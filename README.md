@@ -63,23 +63,25 @@ A production-ready static web application for secure two-party deals with collat
 ├── firestore.indexes.json     # Firestore indexes
 ├── README.md                  # This file
 │
-├── /public                    # Static frontend (Firebase Hosting)
-│   ├── index.html             # Main HTML
-│   ├── styles.css             # Custom CSS + theme variables
-│   ├── app.js                 # App entry point
-│   ├── router.js              # SPA router
-│   ├── firebase.js            # Firebase SDK initialization
-│   ├── api.js                 # Cloud Functions API wrapper
-│   ├── store.js               # State management + localStorage
-│   └── /ui                    # UI modules
-│       ├── components.js      # Reusable components
-│       ├── auth.js            # Login/signup pages
-│       ├── dashboard.js       # Main dashboard
-│       ├── dealWizard.js      # Create deal flow
-│       ├── dealDetail.js      # Deal detail page
-│       └── settings.js        # Settings page
+├── index.html                 # Main HTML (frontend in root for Cloudflare Pages)
+├── styles.css                 # Custom CSS + theme variables
+├── app.js                     # App entry point
+├── router.js                  # SPA hash router
+├── firebase.js                # Firebase SDK initialization
+├── api.js                     # Cloud Functions API wrapper
+├── store.js                   # State management + localStorage
+├── _headers                   # Cloudflare Pages headers configuration
+├── _routes.json               # Cloudflare Pages routing config (static asset exclusion)
 │
-└── /functions                 # Cloud Functions
+├── /ui                        # UI modules
+│   ├── components.js          # Reusable components
+│   ├── auth.js                # Login/signup pages
+│   ├── dashboard.js           # Main dashboard
+│   ├── dealWizard.js          # Create deal flow
+│   ├── dealDetail.js          # Deal detail page
+│   └── settings.js            # Settings page
+│
+└── /firebase-functions        # Firebase Cloud Functions (NOT Cloudflare Pages Functions)
     ├── package.json           # Node dependencies
     ├── tsconfig.json          # TypeScript config
     └── /src
@@ -88,6 +90,10 @@ A production-ready static web application for secure two-party deals with collat
         ├── validators.ts      # Zod schemas
         └── dealMachine.ts     # Deal state machine logic
 ```
+
+**Note on Routing:** This app uses **hash-based routing** (`#/app`, `#/deal/123`) which works perfectly with static hosting on Cloudflare Pages without needing server-side redirects. All navigation is client-side via the hash router.
+
+**Note on Functions:** The `/firebase-functions` directory contains Firebase Cloud Functions (backend), NOT Cloudflare Pages Functions. This directory is named to avoid confusion with Cloudflare's build system.
 
 ## Quick Start
 
@@ -117,9 +123,25 @@ See **[CLOUDFLARE_DEPLOYMENT.md](./CLOUDFLARE_DEPLOYMENT.md)** for complete step
 - Free SSL certificates
 - Fast deployment times
 
+**Cloudflare Pages Settings:**
+```
+Framework preset: None
+Build command: (leave empty)
+Build output directory: / (root)
+Root directory: (leave empty or /)
+```
+
+**Important Configuration Files:**
+- `_routes.json` - Defines which paths are static assets vs dynamic routes
+- `_headers` - Sets security and caching headers
+- Hash-based routing (`#/app`, `#/deal/123`) - No server-side redirects needed
+
+**Backend Note:**
+The `/firebase-functions` directory contains Firebase Cloud Functions for the backend (Auth, Firestore, Stripe). This is NOT Cloudflare Pages Functions - Cloudflare only serves the static frontend.
+
 ### Option 2: GitHub Pages Deployment
 
-GitHub Pages deployment is automatically configured via GitHub Actions. When you push to the `main` branch, the site is automatically deployed from the `public/` directory.
+GitHub Pages deployment is automatically configured via GitHub Actions. When you push to the `main` branch, the site is automatically deployed from the root directory.
 
 **Quick Setup:**
 1. Go to your repository → Settings → Pages
@@ -129,7 +151,7 @@ GitHub Pages deployment is automatically configured via GitHub Actions. When you
 
 **Important:** You still need to:
 - Configure Firebase backend (Auth, Firestore, Functions)
-- Update `public/firebase.js` with your Firebase credentials
+- Update `firebase.js` with your Firebase credentials
 - Add your GitHub Pages domain to Firebase authorized domains
 
 ### Option 3: Firebase Hosting Deployment
@@ -190,7 +212,7 @@ In the [Firebase Console](https://console.firebase.google.com):
 
 #### Update Frontend Configuration
 
-Edit `public/firebase.js` and replace placeholder values:
+Edit `firebase.js` in the root directory and replace placeholder values:
 
 ```javascript
 const firebaseConfig = {
@@ -638,11 +660,11 @@ jobs:
 
 **Symptoms**: Site loads but shows a configuration warning page
 
-**Solution**: You're using placeholder Firebase credentials. Update `public/firebase.js` with your actual Firebase config:
+**Solution**: You're using placeholder Firebase credentials. Update `firebase.js` with your actual Firebase config:
 
 1. Go to Firebase Console → Project Settings → Your apps → Web app
 2. Copy your Firebase configuration
-3. Replace placeholder values in `public/firebase.js`
+3. Replace placeholder values in `firebase.js`
 4. Redeploy your site
 
 **Issue: Functions deployment fails**

@@ -123,7 +123,7 @@ firebase deploy --only functions
    ```
 4. Select event: `checkout.session.completed`
 5. Copy the webhook signing secret (starts with `whsec_`)
-6. Add to `functions/.env`:
+6. Add to `firebase-functions/.env`:
    ```env
    STRIPE_SECRET_KEY=sk_live_your_key_here
    STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
@@ -222,7 +222,7 @@ After setting up a custom domain:
    - Add your custom domain
 
 2. **Stripe Webhook**:
-   - Update `functions/.env`:
+   - Update `firebase-functions/.env`:
      ```env
      APP_URL=https://app.yourdomain.com
      ```
@@ -339,7 +339,7 @@ jobs:
 3. Wrong APP_URL in Cloud Functions
 
 **Solutions**:
-1. Verify Stripe keys in `functions/.env`
+1. Verify Stripe keys in `firebase-functions/.env`
 2. Check Stripe Dashboard → Webhooks for webhook status
 3. Verify `APP_URL` matches your GitHub Pages URL
 4. Check Cloud Function logs in Firebase Console

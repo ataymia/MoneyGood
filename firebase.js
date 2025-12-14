@@ -52,7 +52,7 @@ function validateFirebaseConfig(config) {
     console.error('1. Go to Firebase Console: https://console.firebase.google.com');
     console.error('2. Select your project > Project Settings > Your apps > Web app');
     console.error('3. Copy your Firebase config values');
-    console.error('4. Replace the placeholder values in public/firebase.js');
+    console.error('4. Replace the placeholder values in firebase.js (in repository root)');
     console.error('5. For Cloudflare deployment, see CLOUDFLARE_DEPLOYMENT.md');
     
     // Show user-friendly error in the UI
@@ -81,8 +81,9 @@ function validateFirebaseConfig(config) {
                   <li>Select your project or create a new one</li>
                   <li>Navigate to: <strong>Project Settings → Your apps → Web app</strong></li>
                   <li>Copy your Firebase configuration values</li>
-                  <li>Update <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px;">public/firebase.js</code> with your credentials</li>
-                  <li>For Cloudflare Pages, see <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px;">CLOUDFLARE_DEPLOYMENT.md</code></li>
+                  <li>Update <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px;">firebase.js</code> in the repository root with your credentials</li>
+                  <li>Push changes to trigger Cloudflare Pages redeployment</li>
+                  <li>For detailed instructions, see <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px;">CLOUDFLARE_DEPLOYMENT.md</code></li>
                 </ol>
               </div>
               

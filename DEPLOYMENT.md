@@ -21,7 +21,7 @@ Quick reference for deploying MoneyGood to production.
 ### 3. Configuration
 
 #### A. Frontend Configuration
-Edit `public/firebase.js` and replace placeholder values:
+Edit `firebase.js` in the root directory and replace placeholder values:
 
 ```javascript
 const firebaseConfig = {
@@ -37,7 +37,7 @@ const firebaseConfig = {
 Get these from: Firebase Console > Project Settings > General > Your apps > Web app
 
 #### B. Backend Configuration
-Create `functions/.env` file:
+Create `firebase-functions/.env` file:
 
 ```env
 STRIPE_SECRET_KEY=sk_live_your_live_key_here
@@ -125,7 +125,7 @@ firebase deploy
    - `checkout.session.completed`
 5. Click "Add endpoint"
 6. Copy the webhook signing secret (starts with `whsec_`)
-7. Update `functions/.env` with this secret
+7. Update `firebase-functions/.env` with this secret
 8. Redeploy functions:
    ```bash
    firebase deploy --only functions
@@ -160,7 +160,7 @@ firebase deploy
 ### Development
 
 ```bash
-# Use test Stripe keys in functions/.env
+# Use test Stripe keys in firebase-functions/.env
 STRIPE_SECRET_KEY=sk_test_...
 
 # Deploy to development project
@@ -171,7 +171,7 @@ firebase deploy
 ### Production
 
 ```bash
-# Use live Stripe keys in functions/.env
+# Use live Stripe keys in firebase-functions/.env
 STRIPE_SECRET_KEY=sk_live_...
 
 # Deploy to production project
@@ -212,14 +212,14 @@ firebase deploy --only functions --debug
 ### Issue: "Stripe webhook not working"
 **Solution**: 
 1. Verify webhook URL matches deployed function
-2. Check webhook secret in functions/.env
+2. Check webhook secret in firebase-functions/.env
 3. Test webhook with Stripe CLI:
    ```bash
    stripe listen --forward-to https://YOUR_FUNCTION_URL
    ```
 
 ### Issue: "Firebase config not working"
-**Solution**: Clear browser cache and verify config values in `public/firebase.js`
+**Solution**: Clear browser cache and verify config values in `firebase.js`
 
 ## Performance Optimization
 
