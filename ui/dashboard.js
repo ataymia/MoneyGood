@@ -8,28 +8,32 @@ export async function renderDashboard() {
   
   const content = document.getElementById('content');
   content.innerHTML = `
-    ${Navbar({ user })}
-    <div class="min-h-screen bg-gradient-to-br from-emerald-50 to-navy-50 dark:from-navy-900 dark:to-navy-800">
-      <div class="container mx-auto px-4 py-8">
-        <div class="flex items-center justify-between mb-8">
-          <div>
-            <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Dashboard</h1>
-            <p class="text-navy-600 dark:text-navy-400">Manage your deals and transactions</p>
+    <div class="flex h-screen bg-navy-50 dark:bg-navy-900">
+      ${renderSidebar(user)}
+      <div class="flex-1 overflow-y-auto">
+        ${Navbar({ user })}
+        <div class="container mx-auto px-4 py-8">
+          <div class="flex items-center justify-between mb-8">
+            <div>
+              <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Dashboard</h1>
+              <p class="text-navy-600 dark:text-navy-400">Manage your deals and transactions</p>
+            </div>
+            <button 
+              onclick="window.location.hash = '/deal/new'" 
+              class="btn-primary bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition shadow-glow"
+            >
+              + New Deal
+            </button>
           </div>
-          <button 
-            onclick="window.location.hash = '/deal/new'" 
-            class="btn-primary bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition shadow-glow"
-          >
-            + New Deal
-          </button>
-        </div>
-        
-        <div id="deals-container" class="space-y-8">
-          <div class="flex items-center justify-center py-12">
-            ${Spinner({ size: 'lg' })}
+          
+          <div id="deals-container" class="space-y-8">
+            <div class="flex items-center justify-center py-12">
+              ${Spinner({ size: 'lg' })}
+            </div>
           </div>
         </div>
       </div>
+      ${renderMobileNav(user)}
     </div>
   `;
 
@@ -239,4 +243,75 @@ function formatDealType(type) {
     'GOODS_GOODS': 'Goods ↔ Goods'
   };
   return types[type] || type;
+}
+
+function renderSidebar(user) {
+  const currentPath = window.location.hash.slice(1) || '/';
+  
+  return `
+    <aside class="hidden md:block w-64 bg-white dark:bg-navy-800 border-r border-navy-200 dark:border-navy-700">
+      <div class="p-6">
+        <a href="#/" class="flex items-center gap-2 text-2xl font-bold mb-8">
+          <span>💰</span>
+          <span class="gradient-text">MoneyGood</span>
+        </a>
+        
+        <nav class="space-y-2">
+          <a href="#/app" class="nav-item ${currentPath === '/app' ? 'active' : ''}">
+            <span class="text-xl">📊</span>
+            <span>Dashboard</span>
+          </a>
+          <a href="#/deals" class="nav-item ${currentPath === '/deals' ? 'active' : ''}">
+            <span class="text-xl">📋</span>
+            <span>All Deals</span>
+          </a>
+          <a href="#/deal/new" class="nav-item ${currentPath === '/deal/new' ? 'active' : ''}">
+            <span class="text-xl">➕</span>
+            <span>Create Deal</span>
+          </a>
+          <a href="#/notifications" class="nav-item ${currentPath === '/notifications' ? 'active' : ''}">
+            <span class="text-xl">🔔</span>
+            <span>Notifications</span>
+          </a>
+          <a href="#/settings" class="nav-item ${currentPath === '/settings' ? 'active' : ''}">
+            <span class="text-xl">⚙️</span>
+            <span>Settings</span>
+          </a>
+          <a href="#/account" class="nav-item ${currentPath === '/account' ? 'active' : ''}">
+            <span class="text-xl">👤</span>
+            <span>Account</span>
+          </a>
+        </nav>
+      </div>
+    </aside>
+  `;
+}
+
+function renderMobileNav(user) {
+  const currentPath = window.location.hash.slice(1) || '/';
+  
+  return `
+    <div class="mobile-nav md:hidden">
+      <a href="#/app" class="mobile-nav-item ${currentPath === '/app' ? 'active' : ''}">
+        <span class="text-2xl">📊</span>
+        <span>Dashboard</span>
+      </a>
+      <a href="#/deals" class="mobile-nav-item ${currentPath === '/deals' ? 'active' : ''}">
+        <span class="text-2xl">📋</span>
+        <span>Deals</span>
+      </a>
+      <a href="#/deal/new" class="mobile-nav-item ${currentPath === '/deal/new' ? 'active' : ''}">
+        <span class="text-2xl">➕</span>
+        <span>New</span>
+      </a>
+      <a href="#/notifications" class="mobile-nav-item ${currentPath === '/notifications' ? 'active' : ''}">
+        <span class="text-2xl">🔔</span>
+        <span>Alerts</span>
+      </a>
+      <a href="#/settings" class="mobile-nav-item ${currentPath === '/settings' ? 'active' : ''}">
+        <span class="text-2xl">⚙️</span>
+        <span>More</span>
+      </a>
+    </div>
+  `;
 }

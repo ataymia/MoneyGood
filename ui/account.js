@@ -157,6 +157,7 @@ export async function renderAccount() {
           </div>
         </div>
       </div>
+      ${renderMobileNav(user)}
     </div>
   `;
   
@@ -443,3 +444,32 @@ window.showDeleteAccountModal = () => {
     });
   }, 100);
 };
+
+function renderMobileNav(user) {
+  const currentPath = window.location.hash.slice(1) || '/';
+  
+  return `
+    <div class="mobile-nav md:hidden">
+      <a href="#/app" class="mobile-nav-item ${currentPath === '/app' ? 'active' : ''}">
+        <span class="text-2xl">📊</span>
+        <span>Dashboard</span>
+      </a>
+      <a href="#/deals" class="mobile-nav-item ${currentPath === '/deals' ? 'active' : ''}">
+        <span class="text-2xl">📋</span>
+        <span>Deals</span>
+      </a>
+      <a href="#/deal/new" class="mobile-nav-item ${currentPath === '/deal/new' ? 'active' : ''}">
+        <span class="text-2xl">➕</span>
+        <span>New</span>
+      </a>
+      <a href="#/notifications" class="mobile-nav-item ${currentPath === '/notifications' ? 'active' : ''}">
+        <span class="text-2xl">🔔</span>
+        <span>Alerts</span>
+      </a>
+      <a href="#/settings" class="mobile-nav-item ${currentPath === '/settings' ? 'active' : ''}">
+        <span class="text-2xl">⚙️</span>
+        <span>More</span>
+      </a>
+    </div>
+  `;
+}
