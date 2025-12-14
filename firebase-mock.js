@@ -258,7 +258,7 @@ export async function updateDoc(docRef, data) {
 
 export async function addDoc(collectionRef, data) {
   const collectionName = collectionRef._collectionName;
-  const id = 'mock-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  const id = 'mock-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
   
   if (!mockData[collectionName]) {
     mockData[collectionName] = {};
