@@ -6,6 +6,7 @@ import { renderDashboard } from './ui/dashboard.js';
 import { renderDealWizard } from './ui/dealWizard.js';
 import { renderDealDetail } from './ui/dealDetail.js';
 import { renderSettings } from './ui/settings.js';
+import { renderNotifications } from './ui/notifications.js';
 import { Navbar, showToast } from './ui/components.js';
 import { doc, setDoc, serverTimestamp, getDoc } from './firebase.js';
 import { acceptInvite } from './api.js';
@@ -280,30 +281,7 @@ async function renderJoinDeal(params) {
   }
 }
 
-// Notifications page
-async function renderNotifications() {
-  const { user } = store.getState();
-  
-  const content = document.getElementById('content');
-  content.innerHTML = `
-    ${Navbar({ user })}
-    <div class="min-h-screen bg-gradient-to-br from-emerald-50 to-navy-50 dark:from-navy-900 dark:to-navy-800 py-8">
-      <div class="container mx-auto px-4">
-        <div class="max-w-3xl mx-auto">
-          <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-8">Notifications</h1>
-          
-          <div class="bg-white dark:bg-navy-800 rounded-2xl shadow-xl p-8 text-center">
-            <div class="text-6xl mb-4">🔔</div>
-            <h2 class="text-xl font-bold text-navy-900 dark:text-white mb-2">No notifications yet</h2>
-            <p class="text-navy-600 dark:text-navy-400">
-              You'll see updates about your deals here
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
+// Notifications page handled by ui/notifications.js
 
 // Global logout handler
 window.handleLogout = async () => {
