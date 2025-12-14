@@ -14,6 +14,7 @@ export type DealStatus =
 export type DealType = 'CASH_CASH' | 'CASH_GOODS' | 'GOODS_GOODS';
 
 // Re-export fee calculations for backward compatibility
+// dealType parameter kept for API compatibility but not used (fees are fixed)
 export function calculateSetupFee(dealType: DealType): number {
   return calcSetupFee();
 }

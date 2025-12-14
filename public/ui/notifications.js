@@ -1,4 +1,4 @@
-import { db, collection, query, where, orderBy, onSnapshot, doc, updateDoc } from '../firebase.js';
+import { db, collection, query, where, orderBy, onSnapshot, doc, updateDoc, getDocs } from '../firebase.js';
 import { router } from '../router.js';
 import { store } from '../store.js';
 import { Navbar, Button, Card, LoadingSpinner } from './components.js';
@@ -253,9 +253,6 @@ window.markAllAsRead = async function() {
     });
   }
 };
-
-// Import getDocs for mark all as read
-import { getDocs } from '../firebase.js';
 
 // Cleanup on route change
 window.addEventListener('hashchange', () => {
