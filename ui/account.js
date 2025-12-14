@@ -1,0 +1,445 @@
+import { Navbar, Card, Input, showToast, showModal } from './components.js';
+import { router } from '../router.js';
+import { store } from '../store.js';
+import { auth, db, doc, getDoc, updateDoc, signOut } from '../firebase.js';
+import { updateProfile, updatePassword, deleteUser } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+export async function renderAccount() {
+  const { user } = store.getState();
+  
+  if (!user) {
+    router.navigate('/login');
+    return;
+  }
+  
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="flex h-screen bg-navy-50 dark:bg-navy-900">
+      ${renderSidebar(user)}
+      <div class="flex-1 overflow-y-auto">
+        ${Navbar({ user })}
+        <div class="container mx-auto px-4 py-8 max-w-4xl">
+          <div class="mb-8">
+            <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Account</h1>
+            <p class="text-navy-600 dark:text-navy-400">Manage your profile and account settings</p>
+          </div>
+          
+          <!-- Profile Section -->
+          <div class="mb-6">
+            ${Card({ 
+              title: 'Profile Information',
+              children: `
+                <form id="profile-form" class="space-y-4">
+                  ${Input({ 
+                    id: 'display-name', 
+                    label: 'Display Name', 
+                    placeholder: 'Enter your name',
+                    value: user.displayName || ''
+                  })}
+                  
+                  <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-navy-700 dark:text-navy-200">Email</label>
+                    <input 
+                      type="email" 
+                      value="${user.email || ''}" 
+                      disabled
+                      class="w-full bg-navy-100 dark:bg-navy-700 cursor-not-allowed"
+                    />
+                    <p class="text-xs text-navy-500 dark:text-navy-400 mt-1">
+                      Email cannot be changed at this time
+                    </p>
+                  </div>
+                  
+                  <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-navy-700 dark:text-navy-200">User ID</label>
+                    <input 
+                      type="text" 
+                      value="${user.uid}" 
+                      disabled
+                      class="w-full bg-navy-100 dark:bg-navy-700 cursor-not-allowed font-mono text-sm"
+                    />
+                  </div>
+                  
+                  <button 
+                    type="submit" 
+                    class="btn-primary bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700"
+                  >
+                    Update Profile
+                  </button>
+                </form>
+              `
+            })}
+          </div>
+          
+          <!-- Security Section -->
+          <div class="mb-6">
+            ${Card({ 
+              title: 'Security',
+              children: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-semibold text-navy-900 dark:text-white mb-2">Change Password</h4>
+                    <p class="text-sm text-navy-600 dark:text-navy-400 mb-4">
+                      Update your password to keep your account secure
+                    </p>
+                    <button 
+                      onclick="window.showChangePasswordModal()" 
+                      class="px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700"
+                    >
+                      Change Password
+                    </button>
+                  </div>
+                  
+                  <div class="pt-4 border-t border-navy-200 dark:border-navy-700">
+                    <h4 class="font-semibold text-navy-900 dark:text-white mb-2">Sign Out</h4>
+                    <p class="text-sm text-navy-600 dark:text-navy-400 mb-4">
+                      Sign out of your account on this device
+                    </p>
+                    <button 
+                      onclick="window.handleLogout()" 
+                      class="px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              `
+            })}
+          </div>
+          
+          <!-- Account Stats -->
+          <div class="mb-6">
+            ${Card({ 
+              title: 'Account Statistics',
+              children: `
+                <div id="account-stats" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div class="text-center p-4 bg-navy-50 dark:bg-navy-900 rounded-lg">
+                    <div class="text-2xl font-bold text-emerald-600" id="stat-total-deals">-</div>
+                    <div class="text-xs text-navy-600 dark:text-navy-400">Total Deals</div>
+                  </div>
+                  <div class="text-center p-4 bg-navy-50 dark:bg-navy-900 rounded-lg">
+                    <div class="text-2xl font-bold text-emerald-600" id="stat-active-deals">-</div>
+                    <div class="text-xs text-navy-600 dark:text-navy-400">Active</div>
+                  </div>
+                  <div class="text-center p-4 bg-navy-50 dark:bg-navy-900 rounded-lg">
+                    <div class="text-2xl font-bold text-emerald-600" id="stat-completed-deals">-</div>
+                    <div class="text-xs text-navy-600 dark:text-navy-400">Completed</div>
+                  </div>
+                  <div class="text-center p-4 bg-navy-50 dark:bg-navy-900 rounded-lg">
+                    <div class="text-2xl font-bold text-navy-600 dark:text-navy-400" id="stat-member-since">-</div>
+                    <div class="text-xs text-navy-600 dark:text-navy-400">Member Since</div>
+                  </div>
+                </div>
+              `
+            })}
+          </div>
+          
+          <!-- Danger Zone -->
+          <div class="mb-6">
+            ${Card({ 
+              title: 'Danger Zone',
+              children: `
+                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <h4 class="font-semibold text-red-900 dark:text-red-300 mb-2">Delete Account</h4>
+                  <p class="text-sm text-red-700 dark:text-red-400 mb-4">
+                    Once you delete your account, there is no going back. This action cannot be undone.
+                    All your deals must be completed or cancelled before you can delete your account.
+                  </p>
+                  <button 
+                    onclick="window.showDeleteAccountModal()" 
+                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  >
+                    Delete Account
+                  </button>
+                </div>
+              `
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Load account stats
+  loadAccountStats(user.uid);
+  
+  // Handle profile form submission
+  document.getElementById('profile-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await handleProfileUpdate(user);
+  });
+}
+
+async function loadAccountStats(userId) {
+  try {
+    if (!window.firebaseReady) {
+      return;
+    }
+
+    // Get user document for member since date
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    const userData = userDoc.data();
+    
+    if (userData?.createdAt) {
+      const memberSince = new Date(userData.createdAt.toDate()).toLocaleDateString('en-US', { 
+        month: 'short', 
+        year: 'numeric' 
+      });
+      document.getElementById('stat-member-since').textContent = memberSince;
+    }
+    
+    // Get deals stats (simplified - in production, use aggregation)
+    const { collection, query, where, getDocs } = await import('../firebase.js');
+    const dealsQuery = query(
+      collection(db, 'deals'),
+      where('participants', 'array-contains', userId)
+    );
+    
+    const snapshot = await getDocs(dealsQuery);
+    const deals = snapshot.docs.map(doc => doc.data());
+    
+    document.getElementById('stat-total-deals').textContent = deals.length;
+    document.getElementById('stat-active-deals').textContent = deals.filter(d => d.status === 'active').length;
+    document.getElementById('stat-completed-deals').textContent = deals.filter(d => d.status === 'completed').length;
+  } catch (error) {
+    console.error('Error loading account stats:', error);
+  }
+}
+
+async function handleProfileUpdate(user) {
+  try {
+    const displayName = document.getElementById('display-name').value.trim();
+    
+    // Update Firebase Auth profile
+    await updateProfile(user, { displayName });
+    
+    // Update Firestore user document
+    if (window.firebaseReady) {
+      await updateDoc(doc(db, 'users', user.uid), {
+        displayName,
+        updatedAt: new Date()
+      });
+    }
+    
+    // Update local state
+    store.setState({ user: { ...user, displayName } });
+    
+    showToast('Profile updated successfully', 'success');
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    showToast('Failed to update profile: ' + error.message, 'error');
+  }
+}
+
+function renderSidebar(user) {
+  const currentPath = window.location.hash.slice(1) || '/';
+  
+  return `
+    <aside class="hidden md:block w-64 bg-white dark:bg-navy-800 border-r border-navy-200 dark:border-navy-700">
+      <div class="p-6">
+        <a href="#/" class="flex items-center gap-2 text-2xl font-bold mb-8">
+          <span>💰</span>
+          <span class="gradient-text">MoneyGood</span>
+        </a>
+        
+        <nav class="space-y-2">
+          <a href="#/app" class="nav-item ${currentPath === '/app' ? 'active' : ''}">
+            <span class="text-xl">📊</span>
+            <span>Dashboard</span>
+          </a>
+          <a href="#/deals" class="nav-item ${currentPath === '/deals' ? 'active' : ''}">
+            <span class="text-xl">📋</span>
+            <span>All Deals</span>
+          </a>
+          <a href="#/deal/new" class="nav-item ${currentPath === '/deal/new' ? 'active' : ''}">
+            <span class="text-xl">➕</span>
+            <span>Create Deal</span>
+          </a>
+          <a href="#/notifications" class="nav-item ${currentPath === '/notifications' ? 'active' : ''}">
+            <span class="text-xl">🔔</span>
+            <span>Notifications</span>
+          </a>
+          <a href="#/settings" class="nav-item ${currentPath === '/settings' ? 'active' : ''}">
+            <span class="text-xl">⚙️</span>
+            <span>Settings</span>
+          </a>
+          <a href="#/account" class="nav-item ${currentPath === '/account' ? 'active' : ''}">
+            <span class="text-xl">👤</span>
+            <span>Account</span>
+          </a>
+        </nav>
+      </div>
+    </aside>
+  `;
+}
+
+// Global modal functions
+window.showChangePasswordModal = () => {
+  const closeModal = showModal('Change Password', `
+    <form id="change-password-form" class="space-y-4">
+      ${Input({ 
+        id: 'current-password', 
+        type: 'password',
+        label: 'Current Password', 
+        placeholder: 'Enter current password',
+        required: true
+      })}
+      
+      ${Input({ 
+        id: 'new-password', 
+        type: 'password',
+        label: 'New Password', 
+        placeholder: 'Enter new password (min 6 characters)',
+        required: true,
+        min: 6
+      })}
+      
+      ${Input({ 
+        id: 'confirm-password', 
+        type: 'password',
+        label: 'Confirm New Password', 
+        placeholder: 'Re-enter new password',
+        required: true
+      })}
+      
+      <div class="flex gap-3 pt-4">
+        <button 
+          type="submit" 
+          class="flex-1 btn-primary bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700"
+        >
+          Update Password
+        </button>
+        <button 
+          type="button" 
+          onclick="this.closest('.fixed').remove()" 
+          class="flex-1 px-6 py-2 border border-navy-300 dark:border-navy-600 text-navy-700 dark:text-navy-300 rounded-lg hover:bg-navy-50 dark:hover:bg-navy-800"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  `);
+  
+  // Handle form submission
+  setTimeout(() => {
+    document.getElementById('change-password-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const newPassword = document.getElementById('new-password').value;
+      const confirmPassword = document.getElementById('confirm-password').value;
+      
+      if (newPassword !== confirmPassword) {
+        showToast('Passwords do not match', 'error');
+        return;
+      }
+      
+      if (newPassword.length < 6) {
+        showToast('Password must be at least 6 characters', 'error');
+        return;
+      }
+      
+      try {
+        await updatePassword(auth.currentUser, newPassword);
+        showToast('Password updated successfully', 'success');
+        closeModal();
+      } catch (error) {
+        console.error('Error updating password:', error);
+        if (error.code === 'auth/requires-recent-login') {
+          showToast('Please log out and log back in to change your password', 'error');
+        } else {
+          showToast('Failed to update password: ' + error.message, 'error');
+        }
+      }
+    });
+  }, 100);
+};
+
+window.showDeleteAccountModal = () => {
+  const closeModal = showModal('Delete Account', `
+    <div class="space-y-4">
+      <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <p class="text-red-900 dark:text-red-300 font-semibold mb-2">⚠️ Warning: This action cannot be undone!</p>
+        <p class="text-sm text-red-700 dark:text-red-400">
+          Deleting your account will permanently remove:
+        </p>
+        <ul class="list-disc list-inside text-sm text-red-700 dark:text-red-400 mt-2 space-y-1">
+          <li>Your profile and account data</li>
+          <li>Access to all your deals (active and completed)</li>
+          <li>All notifications and settings</li>
+          <li>Any pending transactions</li>
+        </ul>
+      </div>
+      
+      <form id="delete-account-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-2 text-navy-700 dark:text-navy-200">
+            Type "DELETE" to confirm
+          </label>
+          <input 
+            type="text" 
+            id="delete-confirmation" 
+            placeholder="Type DELETE"
+            class="w-full"
+            required
+          />
+        </div>
+        
+        <div class="flex gap-3 pt-4">
+          <button 
+            type="submit" 
+            class="flex-1 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            Delete My Account
+          </button>
+          <button 
+            type="button" 
+            onclick="this.closest('.fixed').remove()" 
+            class="flex-1 px-6 py-2 border border-navy-300 dark:border-navy-600 text-navy-700 dark:text-navy-300 rounded-lg hover:bg-navy-50 dark:hover:bg-navy-800"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  `);
+  
+  // Handle form submission
+  setTimeout(() => {
+    document.getElementById('delete-account-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const confirmation = document.getElementById('delete-confirmation').value;
+      
+      if (confirmation !== 'DELETE') {
+        showToast('Please type DELETE to confirm', 'error');
+        return;
+      }
+      
+      try {
+        const user = auth.currentUser;
+        
+        // Soft delete in Firestore (keep data for records)
+        if (window.firebaseReady) {
+          await updateDoc(doc(db, 'users', user.uid), {
+            deleted: true,
+            deletedAt: new Date()
+          });
+        }
+        
+        // Delete the authentication account
+        await deleteUser(user);
+        
+        showToast('Account deleted successfully', 'success');
+        closeModal();
+        router.navigate('/');
+      } catch (error) {
+        console.error('Error deleting account:', error);
+        if (error.code === 'auth/requires-recent-login') {
+          showToast('Please log out and log back in to delete your account', 'error');
+        } else {
+          showToast('Failed to delete account: ' + error.message, 'error');
+        }
+      }
+    });
+  }, 100);
+};
