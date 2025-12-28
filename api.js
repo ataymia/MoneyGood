@@ -1,5 +1,6 @@
-// Use mock Firebase for demo mode - switch back to './firebase.js' when ready
-import { httpsCallable } from './firebase-mock.js';
+// Firebase Functions API wrapper
+import { httpsCallable } from './firebaseClient.js';
+import { redirectToCheckout } from './stripeClient.js';
 
 // Cloud Functions API wrapper 
 
@@ -18,6 +19,12 @@ export async function acceptInvite(token) {
 export async function createCheckoutSession(dealId, purpose) {
   const callable = httpsCallable(window.firebaseFunctions, 'createCheckoutSession');
   const result = await callable({ dealId, purpose });
+  
+  // Automatically redirect to Stripe Checkout
+  if (result.data && result.data.url) {
+    window.location.href = result.data.url;
+  }
+  
   return result.data;
 }
 

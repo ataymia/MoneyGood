@@ -3,7 +3,7 @@ import { renderSidebar, renderMobileNav } from './navigation.js';
 import { router } from '../router.js';
 import { store } from '../store.js';
 // Use mock Firebase for demo mode - switch back to '../firebase.js' when ready
-import { auth, db, doc, getDoc, updateDoc, signOut } from '../firebase-mock.js';
+import { doc, getDoc, updateDoc, signOut } from '../firebaseClient.js';
 // Mock these Firebase auth functions for demo mode
 const updateProfile = async (user, data) => { console.log('Mock updateProfile:', data); };
 const updatePassword = async (user, password) => { console.log('Mock updatePassword'); };

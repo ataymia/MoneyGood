@@ -49,7 +49,9 @@ export function calculateFairnessHold(declaredValueCents: number): number {
  * Calculate all fees for a deal based on its type
  */
 export function calculateDealFees(params: {
-  dealType: 'CASH_CASH' | 'CASH_GOODS' | 'GOODS_GOODS';
+  dealType: 'CASH_CASH' | 'CASH_GOODS' | 'GOODS_GOODS' | 
+            'MONEY_MONEY' | 'MONEY_GOODS' | 'MONEY_SERVICE' | 
+            'GOODS_SERVICE' | 'SERVICE_SERVICE';
   declaredValueA?: number;
   declaredValueB?: number;
 }): FeeCalculation {
@@ -59,8 +61,12 @@ export function calculateDealFees(params: {
   let fairnessHoldA = 0;
   let fairnessHoldB = 0;
 
+  // Normalize deal type to handle both legacy and new formats
+  const normalizedType = dealType.replace('MONEY', 'CASH').replace('SERVICE', 'GOODS') as 
+    'CASH_CASH' | 'CASH_GOODS' | 'GOODS_GOODS';
+
   // Calculate fairness holds based on deal type
-  switch (dealType) {
+  switch (normalizedType) {
     case 'CASH_CASH':
       // No fairness holds for pure cash deals
       fairnessHoldA = 0;

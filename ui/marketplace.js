@@ -1,5 +1,5 @@
 import { Navbar, showToast, Spinner, SkeletonList, formatCurrency, formatRelativeTime } from './components.js';
-import { collection, query, where, orderBy, getDocs, getDoc, doc, addDoc, serverTimestamp } from '../firebase-mock.js';
+import { collection, query, where, orderBy, getDocs, getDoc, doc, addDoc, serverTimestamp } from '../firebaseClient.js';
 import { store } from '../store.js';
 import { router } from '../router.js';
 

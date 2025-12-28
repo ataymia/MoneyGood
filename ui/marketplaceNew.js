@@ -1,5 +1,5 @@
 import { Navbar, Input, Textarea, showToast, Spinner } from './components.js';
-import { addDoc, collection, serverTimestamp } from '../firebase-mock.js';
+import { addDoc, collection, serverTimestamp } from '../firebaseClient.js';
 import { store } from '../store.js';
 import { router } from '../router.js';
 import { validateDealLanguage, getBlockedLanguageMessage } from '../blocked-language.js';

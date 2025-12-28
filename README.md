@@ -2,6 +2,21 @@
 
 A production-ready static web application for secure two-party deals with collateral, Stripe payments, and dispute resolution. Frontend deployed on **Cloudflare Pages**, backend powered by **Firebase** (Auth, Firestore, Cloud Functions) with **Stripe + Stripe Connect** integration. Built with vanilla JavaScript ES modules.
 
+## 🚀 Quick Setup
+
+**New to MoneyGood?** Follow the complete setup guide:
+
+📘 **[STRIPE_FIREBASE_SETUP.md](./STRIPE_FIREBASE_SETUP.md)** — Complete step-by-step guide for:
+- Firebase configuration with environment variables
+- Stripe integration (Checkout + Webhooks)
+- Cloudflare Pages deployment
+- Local development setup
+- Security best practices
+
+This guide walks you through configuring Firebase, Stripe, and deploying the complete application with proper secrets management.
+
+---
+
 ## Features
 
 ### 🔒 Secure Deals
@@ -164,6 +179,77 @@ All agreements must be independent and standalone. No automatic triggers, extern
 - Stripe account (for payments)
 - Cloudflare account (for hosting frontend)
 - Firebase project (for backend)
+
+### Complete Setup Guide
+
+**👉 Follow [STRIPE_FIREBASE_SETUP.md](./STRIPE_FIREBASE_SETUP.md) for detailed setup instructions.**
+
+The guide covers:
+1. Firebase project setup (Auth, Firestore, Functions)
+2. Stripe account configuration (API keys, webhooks)
+3. Cloudflare Pages environment variables
+4. Firebase Cloud Functions deployment with secrets
+5. Testing and troubleshooting
+
+### Quick Start Summary
+
+1. **Set Firebase environment variables in Cloudflare Pages:**
+   ```
+   VITE_FIREBASE_API_KEY
+   VITE_FIREBASE_AUTH_DOMAIN
+   VITE_FIREBASE_PROJECT_ID
+   VITE_FIREBASE_STORAGE_BUCKET
+   VITE_FIREBASE_MESSAGING_SENDER_ID
+   VITE_FIREBASE_APP_ID
+   VITE_STRIPE_PUBLISHABLE_KEY
+   ```
+
+2. **Set Firebase secrets for Cloud Functions:**
+   ```bash
+   firebase functions:secrets:set STRIPE_SECRET_KEY
+   firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+   ```
+
+3. **Deploy Firebase Functions:**
+   ```bash
+   cd firebase-functions
+   npm install
+   npm run build
+   firebase deploy --only functions
+   ```
+
+4. **Configure Stripe webhook** pointing to your deployed `stripeWebhook` function URL
+
+5. **Deploy frontend** to Cloudflare Pages (automatically triggered on push to main branch)
+
+### Initial Setup (Legacy - use setup guide above instead)
+
+1. **Configure Firebase Credentials** (See [FIREBASE_SETUP.md](./FIREBASE_SETUP.md) or [STRIPE_FIREBASE_SETUP.md](./STRIPE_FIREBASE_SETUP.md))
+   ```bash
+   # NO LONGER NEEDED: Frontend now uses environment variables
+   # See STRIPE_FIREBASE_SETUP.md for proper configuration
+   ```
+
+2. **Install Dependencies**
+   ```bash
+   cd firebase-functions
+   npm install
+   ```
+
+3. **Configure Backend Environment Variables**
+   ```bash
+   # Set Stripe keys for Firebase Functions
+   firebase functions:config:set \
+     stripe.secret_key="sk_test_YOUR_KEY" \
+     stripe.webhook_secret="whsec_YOUR_SECRET"
+   ```
+
+4. **Deploy Backend**
+   ```bash
+   firebase deploy --only functions,firestore
+   ```
+
+5. **Deploy Frontend** (Choose one option below)
 
 ## Deployment Options
 

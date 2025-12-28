@@ -3,6 +3,9 @@
 .env.local
 firebase-functions/.env
 
+# Firebase configuration (contains API keys)
+firebase-config.js
+
 # Firebase
 .firebase/
 firebase-debug.log

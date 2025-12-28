@@ -1,5 +1,14 @@
-// Use mock Firebase for demo mode - switch back to '../firebase.js' when ready
-import { doc, getDoc, collection, query, orderBy, getDocs, addDoc, serverTimestamp } from '../firebase-mock.js';
+// Firebase and API imports
+import { 
+  doc, 
+  getDoc, 
+  collection, 
+  query, 
+  orderBy, 
+  getDocs, 
+  addDoc, 
+  serverTimestamp 
+} from '../firebaseClient.js';
 import { Navbar, Card, formatCurrency, formatDate, showToast, showModal, Spinner, DealStatusTimeline, FundingChecklist, showConfetti } from './components.js';
 import { 
   createCheckoutSession, 
@@ -10,6 +19,7 @@ import {
 } from '../api.js';
 import { store } from '../store.js';
 import { containsBlockedLanguage, getBlockedLanguageMessage } from '../blocked-language.js';
+import { isStripeReady, showStripeConfigError } from '../stripeClient.js';
 
 export async function renderDealDetail(params) {
   const { id: dealId } = params;
@@ -578,6 +588,12 @@ window.copyInviteLink = async () => {
 };
 
 window.handlePayment = async (dealId, purpose) => {
+  // Check if Stripe is configured
+  if (!isStripeReady()) {
+    showStripeConfigError(showToast);
+    return;
+  }
+  
   try {
     showToast('Creating checkout session...', 'info');
     
@@ -590,8 +606,8 @@ window.handlePayment = async (dealId, purpose) => {
     
     const backendPurpose = purposeMap[purpose] || purpose.toUpperCase();
     
-    const result = await createCheckoutSession(dealId, backendPurpose);
-    window.location.href = result.url;
+    // createCheckoutSession will automatically redirect to Stripe
+    await createCheckoutSession(dealId, backendPurpose);
   } catch (error) {
     showToast(error.message || 'Failed to create checkout session', 'error');
   }

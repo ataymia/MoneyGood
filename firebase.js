@@ -1,11 +1,11 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js';
 import { 
   getAuth, 
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged
-} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+} from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js';
 import { 
   getFirestore,
   collection,
@@ -20,24 +20,15 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp
-} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+} from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js';
 import { 
   getFunctions, 
   httpsCallable 
-} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
+} from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-functions.js';
 
-// Firebase configuration
-// ⚠️ IMPORTANT: Replace these placeholder values with your actual Firebase project credentials
-// Get your config from Firebase Console > Project Settings > Your apps > Web app
-// See FIREBASE_CONFIG.md for detailed setup instructions
-const firebaseConfig = {
-  apiKey: "AIzaSyDEMO_KEY_REPLACE_WITH_ACTUAL",
-  authDomain: "moneygood-app.firebaseapp.com",
-  projectId: "moneygood-app",
-  storageBucket: "moneygood-app.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef123456"
-};
+// Import Firebase configuration from separate file (gitignored)
+// Copy firebase-config.template.js to firebase-config.js and update with your credentials
+import { firebaseConfig } from './firebase-config.js';
 
 // Firebase initialization state (safe mode)
 let firebaseApp = null;
@@ -51,22 +42,27 @@ export let firebaseError = null;
 
 // Validate Firebase configuration (non-throwing)
 function validateFirebaseConfig(config) {
+  // Check if config is missing or has placeholder values
+  if (!config || !config.apiKey || !config.projectId) {
+    return 'Firebase configuration is missing. Copy firebase-config.template.js to firebase-config.js and add your credentials.';
+  }
+  
   const isPlaceholder = 
     config.apiKey.includes('DEMO') || 
     config.apiKey.includes('REPLACE') ||
+    config.apiKey.includes('YOUR_') ||
+    config.apiKey.includes('PLACEHOLDER') ||
     config.apiKey === 'AIzaSyDEMO_KEY_REPLACE_WITH_ACTUAL' ||
-    !config.apiKey ||
     config.apiKey.length < 20;
   
   if (isPlaceholder) {
-    const errorMessage = 'Firebase configuration contains placeholder values. See FIREBASE_CONFIG.md for setup instructions.';
+    const errorMessage = 'Firebase configuration contains placeholder values. Update firebase-config.js with your actual Firebase credentials.';
     console.warn('⚠️ Firebase configuration error: Using placeholder credentials!');
     console.warn('📋 To fix this issue:');
-    console.warn('1. Go to Firebase Console: https://console.firebase.google.com');
-    console.warn('2. Select your project > Project Settings > Your apps > Web app');
-    console.warn('3. Copy your Firebase config values');
-    console.warn('4. Replace the placeholder values in firebase.js');
-    console.warn('5. See FIREBASE_CONFIG.md for detailed instructions');
+    console.warn('1. Copy firebase-config.template.js to firebase-config.js');
+    console.warn('2. Go to Firebase Console: https://console.firebase.google.com');
+    console.warn('3. Select your project > Project Settings > Your apps > Web app');
+    console.warn('4. Copy your Firebase config values into firebase-config.js');
     return errorMessage;
   }
   

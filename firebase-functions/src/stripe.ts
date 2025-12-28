@@ -1,8 +1,32 @@
 import Stripe from 'stripe';
+import { defineSecret } from 'firebase-functions/params';
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '';
-export const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2023-10-16',
+// Define secrets using Firebase Functions v2 secrets management
+// These must be set via: firebase functions:secrets:set STRIPE_SECRET_KEY
+export const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
+export const stripeWebhookSecret = defineSecret('STRIPE_WEBHOOK_SECRET');
+
+// Initialize Stripe lazily to avoid errors when secrets aren't loaded
+let stripeInstance: Stripe | null = null;
+
+export function getStripe(): Stripe {
+  if (!stripeInstance) {
+    const secretKey = stripeSecretKey.value();
+    if (!secretKey) {
+      throw new Error('STRIPE_SECRET_KEY secret is not configured');
+    }
+    stripeInstance = new Stripe(secretKey, {
+      apiVersion: '2023-10-16',
+    });
+  }
+  return stripeInstance;
+}
+
+// Keep this export for backward compatibility (will be lazily initialized)
+export const stripe = new Proxy({} as Stripe, {
+  get(target, prop) {
+    return (getStripe() as any)[prop];
+  }
 });
 
 export async function createCheckoutSession(
@@ -11,9 +35,12 @@ export async function createCheckoutSession(
   dealId: string,
   purpose: string,
   customerEmail: string,
+  payerUid: string,
   successUrl: string,
   cancelUrl: string
 ): Promise<Stripe.Checkout.Session> {
+  const stripe = getStripe();
+  
   return await stripe.checkout.sessions.create({
     mode: 'payment',
     payment_method_types: ['card'],
@@ -34,6 +61,7 @@ export async function createCheckoutSession(
     metadata: {
       dealId,
       purpose,
+      payerUid,
     },
     success_url: successUrl,
     cancel_url: cancelUrl,
@@ -41,6 +69,8 @@ export async function createCheckoutSession(
 }
 
 export async function createConnectAccount(email: string): Promise<Stripe.Account> {
+  const stripe = getStripe();
+  
   return await stripe.accounts.create({
     type: 'express',
     country: 'US',
@@ -57,6 +87,8 @@ export async function createAccountLink(
   refreshUrl: string,
   returnUrl: string
 ): Promise<Stripe.AccountLink> {
+  const stripe = getStripe();
+  
   return await stripe.accountLinks.create({
     account: accountId,
     refresh_url: refreshUrl,
@@ -71,6 +103,8 @@ export async function createTransfer(
   destinationAccount: string,
   description: string
 ): Promise<Stripe.Transfer> {
+  const stripe = getStripe();
+  
   return await stripe.transfers.create({
     amount: amountCents,
     currency,
@@ -83,6 +117,8 @@ export async function createRefund(
   paymentIntentId: string,
   amountCents?: number
 ): Promise<Stripe.Refund> {
+  const stripe = getStripe();
+  
   return await stripe.refunds.create({
     payment_intent: paymentIntentId,
     amount: amountCents,
@@ -91,8 +127,14 @@ export async function createRefund(
 
 export function constructWebhookEvent(
   payload: string | Buffer,
-  signature: string,
-  webhookSecret: string
+  signature: string
 ): Stripe.Event {
-  return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+  const stripe = getStripe();
+  const secret = stripeWebhookSecret.value();
+  
+  if (!secret) {
+    throw new Error('STRIPE_WEBHOOK_SECRET secret is not configured');
+  }
+  
+  return stripe.webhooks.constructEvent(payload, signature, secret);
 }

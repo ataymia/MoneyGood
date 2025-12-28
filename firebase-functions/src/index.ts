@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { onRequest } from 'firebase-functions/v2/https';
 import {
   CreateDealSchema,
   AcceptInviteSchema,
@@ -16,6 +17,7 @@ import {
   createConnectAccount,
   createAccountLink,
   constructWebhookEvent,
+  stripeWebhookSecret,
 } from './stripe';
 import {
   calculateSetupFee,
@@ -275,6 +277,7 @@ export const createCheckoutSession = functions.https.onCall(async (data, context
     validated.dealId,
     validated.purpose,
     userEmail,
+    userId,
     successUrl,
     cancelUrl
   );
@@ -761,16 +764,421 @@ export const setupStripeConnect = functions.https.onCall(async (data, context) =
 });
 
 /**
- * Stripe webhook handler
+ * Stripe webhook handler (v2 function with secrets)
+ * Handles payment events: checkout.session.completed, payment_intent.payment_failed,
+ * charge.refunded, charge.dispute.created
  */
-export const stripeWebhook = functions.https.onRequest(async (req, res) => {
+export const stripeWebhook = onRequest(
+  { secrets: [stripeWebhookSecret] },
+  async (req, res) => {
+    const sig = req.headers['stripe-signature'] as string;
+
+    if (!sig) {
+      console.error('Missing stripe-signature header');
+      res.status(400).send('Missing signature');
+      return;
+    }
+
+    let event;
+
+    try {
+      event = constructWebhookEvent(req.rawBody, sig);
+    } catch (err: any) {
+      console.error('Webhook signature verification failed:', err.message);
+      res.status(400).send(`Webhook Error: ${err.message}`);
+      return;
+    }
+
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed':
+          await handleCheckoutCompleted(event.data.object);
+          break;
+
+        case 'payment_intent.payment_failed':
+          await handlePaymentFailed(event.data.object);
+          break;
+
+        case 'charge.refunded':
+          await handleChargeRefunded(event.data.object);
+          break;
+
+        case 'charge.dispute.created':
+          await handleDisputeCreated(event.data.object);
+          break;
+
+        default:
+          console.log(`Unhandled event type: ${event.type}`);
+      }
+
+      res.json({ received: true });
+    } catch (error) {
+      console.error('Error processing webhook:', error);
+      res.status(500).send('Webhook processing failed');
+    }
+  }
+);
+
+/**
+ * Handle successful checkout session completion
+ */
+async function handleCheckoutCompleted(session: any) {
+  const dealId = session.metadata.dealId;
+  const purpose = session.metadata.purpose;
+  const payerUid = session.metadata.payerUid;
+
+  if (!dealId || !purpose || !payerUid) {
+    console.error('Missing metadata in checkout session:', session.id);
+    return;
+  }
+
+  console.log(`Checkout completed: ${session.id} for deal ${dealId}, purpose: ${purpose}`);
+
+  const dealRef = db.collection('deals').doc(dealId);
+  const dealDoc = await dealRef.get();
+
+  if (!dealDoc.exists) {
+    console.error(`Deal ${dealId} not found`);
+    return;
+  }
+
+  const deal = dealDoc.data()!;
+  const isCreator = deal.creatorUid === payerUid;
+  const party = isCreator ? 'A' : 'B';
+
+  // Update payment record
+  const paymentsSnapshot = await db
+    .collection('deals')
+    .doc(dealId)
+    .collection('payments')
+    .where('stripeCheckoutSessionId', '==', session.id)
+    .limit(1)
+    .get();
+
+  if (!paymentsSnapshot.empty) {
+    const paymentDoc = paymentsSnapshot.docs[0];
+    await paymentDoc.ref.update({
+      status: 'succeeded',
+      stripePaymentIntentId: session.payment_intent,
+      paidAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Update deal payment flags based on purpose
+  const updates: any = {
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  // Initialize payments structure if it doesn't exist
+  const payments = deal.payments || {
+    setupFee: {},
+    contribution: {},
+    fairnessHold: {},
+  };
+
+  switch (purpose) {
+    case 'SETUP_FEE':
+    case 'setup_fee':
+      payments.setupFee[payerUid] = {
+        paid: true,
+        sessionId: session.id,
+        paymentIntentId: session.payment_intent,
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      // Legacy fields for backward compatibility
+      updates[`setupFeePaid${party}`] = true;
+      break;
+
+    case 'CONTRIBUTION':
+    case 'contribution':
+      payments.contribution[payerUid] = {
+        paid: true,
+        sessionId: session.id,
+        paymentIntentId: session.payment_intent,
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      updates[`contributionPaid${party}`] = true;
+      break;
+
+    case 'FAIRNESS_HOLD':
+    case 'fairness_hold':
+      payments.fairnessHold[payerUid] = {
+        paid: true,
+        sessionId: session.id,
+        paymentIntentId: session.payment_intent,
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      updates[`fairnessHoldPaid${party}`] = true;
+      break;
+
+    case 'EXTENSION_FEE':
+    case 'extension_fee':
+      // Handle extension fee payment
+      updates.extensionFeesTotalCents = (deal.extensionFeesTotalCents || 0) + session.amount_total;
+      break;
+  }
+
+  updates.payments = payments;
+  await dealRef.update(updates);
+
+  // Log action
+  await logAction(
+    dealId,
+    payerUid,
+    session.customer_email || 'unknown',
+    'PAYMENT_COMPLETED',
+    `Payment of $${(session.amount_total / 100).toFixed(2)} completed for ${purpose}`,
+    {
+      sessionId: session.id,
+      paymentIntentId: session.payment_intent,
+      purpose,
+    }
+  );
+
+  // Check if deal should transition to active status
+  await checkAndActivateDeal(dealId);
+}
+
+/**
+ * Handle failed payment
+ */
+async function handlePaymentFailed(paymentIntent: any) {
+  console.log(`Payment failed: ${paymentIntent.id}`);
+
+  // Find deal by payment intent
+  const dealsSnapshot = await db.collectionGroup('payments')
+    .where('stripePaymentIntentId', '==', paymentIntent.id)
+    .limit(1)
+    .get();
+
+  if (dealsSnapshot.empty) {
+    console.log('No deal found for payment intent:', paymentIntent.id);
+    return;
+  }
+
+  const paymentDoc = dealsSnapshot.docs[0];
+  const dealId = paymentDoc.ref.parent.parent?.id;
+
+  if (!dealId) return;
+
+  await paymentDoc.ref.update({
+    status: 'failed',
+    failureReason: paymentIntent.last_payment_error?.message || 'Payment failed',
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await logAction(
+    dealId,
+    'system',
+    'system',
+    'PAYMENT_FAILED',
+    `Payment failed: ${paymentIntent.last_payment_error?.message || 'Unknown error'}`,
+    { paymentIntentId: paymentIntent.id }
+  );
+}
+
+/**
+ * Handle charge refund
+ */
+async function handleChargeRefunded(charge: any) {
+  console.log(`Charge refunded: ${charge.id}`);
+
+  const dealsSnapshot = await db.collectionGroup('payments')
+    .where('stripePaymentIntentId', '==', charge.payment_intent)
+    .limit(1)
+    .get();
+
+  if (dealsSnapshot.empty) {
+    console.log('No deal found for charge:', charge.id);
+    return;
+  }
+
+  const paymentDoc = dealsSnapshot.docs[0];
+  const dealId = paymentDoc.ref.parent.parent?.id;
+
+  if (!dealId) return;
+
+  await paymentDoc.ref.update({
+    status: 'refunded',
+    refundedAmount: charge.amount_refunded,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await logAction(
+    dealId,
+    'system',
+    'system',
+    'PAYMENT_REFUNDED',
+    `Payment refunded: $${(charge.amount_refunded / 100).toFixed(2)}`,
+    { chargeId: charge.id, paymentIntentId: charge.payment_intent }
+  );
+}
+
+/**
+ * Handle dispute created
+ */
+async function handleDisputeCreated(dispute: any) {
+  console.log(`Dispute created: ${dispute.id}`);
+
+  const dealsSnapshot = await db.collectionGroup('payments')
+    .where('stripePaymentIntentId', '==', dispute.payment_intent)
+    .limit(1)
+    .get();
+
+  if (dealsSnapshot.empty) {
+    console.log('No deal found for dispute:', dispute.id);
+    return;
+  }
+
+  const paymentDoc = dealsSnapshot.docs[0];
+  const dealId = paymentDoc.ref.parent.parent?.id;
+
+  if (!dealId) return;
+
+  const dealRef = db.collection('deals').doc(dealId);
+
+  // Freeze the deal due to dispute
+  await dealRef.update({
+    status: 'frozen',
+    freezeReason: 'payment_dispute',
+    disputeId: dispute.id,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await paymentDoc.ref.update({
+    status: 'disputed',
+    disputeId: dispute.id,
+    disputeReason: dispute.reason,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await logAction(
+    dealId,
+    'system',
+    'system',
+    'PAYMENT_DISPUTED',
+    `Payment dispute created. Deal frozen. Reason: ${dispute.reason}`,
+    { disputeId: dispute.id, paymentIntentId: dispute.payment_intent }
+  );
+
+  // Notify both parties
+  const dealDoc = await dealRef.get();
+  const deal = dealDoc.data();
+
+  if (deal) {
+    await createNotification(
+      deal.creatorUid,
+      'deal-disputed',
+      'Payment Dispute - Deal Frozen',
+      `A payment dispute has been filed for deal "${deal.title}". The deal is now frozen.`,
+      dealId
+    );
+
+    if (deal.participantUid) {
+      await createNotification(
+        deal.participantUid,
+        'deal-disputed',
+        'Payment Dispute - Deal Frozen',
+        `A payment dispute has been filed for deal "${deal.title}". The deal is now frozen.`,
+        dealId
+      );
+    }
+  }
+}
+
+/**
+ * Check if all required payments are completed and activate deal
+ */
+async function checkAndActivateDeal(dealId: string) {
+  const dealRef = db.collection('deals').doc(dealId);
+  const dealDoc = await dealRef.get();
+
+  if (!dealDoc.exists) return;
+
+  const deal = dealDoc.data()!;
+
+  // Skip if already active or past awaiting_funding status
+  if (deal.status !== 'awaiting_funding' && deal.status !== 'invited') {
+    return;
+  }
+
+  const payments = deal.payments || { setupFee: {}, contribution: {}, fairnessHold: {} };
+
+  // Check setup fees
+  const setupFeeComplete =
+    payments.setupFee[deal.creatorUid]?.paid &&
+    (deal.participantUid ? payments.setupFee[deal.participantUid]?.paid : true);
+
+  // Check contributions (if applicable)
+  let contributionComplete = true;
+  if (deal.moneyAmountCents && deal.moneyAmountCents > 0) {
+    const creatorPaysContribution = deal.type?.includes('MONEY') || deal.legA?.kind === 'MONEY';
+    if (creatorPaysContribution) {
+      contributionComplete = payments.contribution[deal.creatorUid]?.paid || false;
+    } else if (deal.participantUid) {
+      contributionComplete = payments.contribution[deal.participantUid]?.paid || false;
+    }
+  }
+
+  // Check fairness holds (if applicable)
+  let fairnessHoldComplete = true;
+  if (deal.fairnessHoldAmountCentsA > 0 || deal.fairnessHoldAmountCentsB > 0) {
+    fairnessHoldComplete =
+      (deal.fairnessHoldAmountCentsA > 0 ? payments.fairnessHold[deal.creatorUid]?.paid : true) &&
+      (deal.fairnessHoldAmountCentsB > 0 && deal.participantUid
+        ? payments.fairnessHold[deal.participantUid]?.paid
+        : true);
+  }
+
+  // Activate if all required payments are complete
+  if (setupFeeComplete && contributionComplete && fairnessHoldComplete) {
+    await dealRef.update({
+      status: 'active',
+      activatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await logAction(
+      dealId,
+      'system',
+      'system',
+      'DEAL_ACTIVATED',
+      'All funding requirements met. Deal is now active.'
+    );
+
+    // Notify both parties
+    await createNotification(
+      deal.creatorUid,
+      'deal-activated',
+      'Deal Activated',
+      `Deal "${deal.title}" is now active. All funding requirements have been met.`,
+      dealId
+    );
+
+    if (deal.participantUid) {
+      await createNotification(
+        deal.participantUid,
+        'deal-activated',
+        'Deal Activated',
+        `Deal "${deal.title}" is now active. All funding requirements have been met.`,
+        dealId
+      );
+    }
+  }
+}
+
+/**
+ * Legacy webhook handler (v1 - kept for backward compatibility during migration)
+ */
+export const stripeWebhookLegacy = functions.https.onRequest(async (req, res) => {
+  console.warn('Legacy webhook called - please update webhook URL to use stripeWebhook v2 function');
   const sig = req.headers['stripe-signature'] as string;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 
   let event;
 
   try {
-    event = constructWebhookEvent(req.rawBody, sig, webhookSecret);
+    event = constructWebhookEvent(req.rawBody, sig);
   } catch (err: any) {
     console.error('Webhook signature verification failed:', err.message);
     res.status(400).send(`Webhook Error: ${err.message}`);
