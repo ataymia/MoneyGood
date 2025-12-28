@@ -1,18 +1,41 @@
 import { z } from 'zod';
 
+// Leg model for structured agreement sides
+const LegSchema = z.object({
+  kind: z.enum(['MONEY', 'GOODS', 'SERVICE']),
+  description: z.string().min(1).max(1000).optional(), // Required for GOODS/SERVICE
+  declaredValueCents: z.number().int().min(0).optional(), // Required for GOODS/SERVICE
+  moneyAmountCents: z.number().int().min(0).optional(), // Required for MONEY
+  dueDate: z.string().optional(), // Optional for SERVICE
+});
+
 export const CreateDealSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().min(1).max(2000),
   participantEmail: z.string().email(),
-  type: z.enum(['CASH_CASH', 'CASH_GOODS', 'GOODS_GOODS']),
+  // Support both old and new type formats for backward compatibility
+  type: z.enum([
+    'CASH_CASH', 'CASH_GOODS', 'GOODS_GOODS', // Legacy
+    'MONEY_MONEY', 'MONEY_GOODS', 'GOODS_GOODS', 'MONEY_SERVICE', 'GOODS_SERVICE', 'SERVICE_SERVICE' // New
+  ]),
   dealDate: z.string(),
   timezone: z.string(),
+  // Legacy fields (kept for backward compatibility)
   moneyAmountCents: z.number().int().min(0).optional(),
   goodsA: z.string().optional(),
   goodsB: z.string().optional(),
   declaredValueA: z.number().int().min(0).optional(),
   declaredValueB: z.number().int().min(0).optional(),
-});
+  // New structured leg model
+  legA: LegSchema.optional(),
+  legB: LegSchema.optional(),
+}).refine((data) => {
+  // If using new leg model, validate legs exist
+  if (data.legA || data.legB) {
+    return data.legA && data.legB;
+  }
+  return true;
+}, { message: 'Both legA and legB must be provided if using leg model' });
 
 export const AcceptInviteSchema = z.object({
   token: z.string().min(1),

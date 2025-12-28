@@ -6,9 +6,11 @@ A production-ready static web application for secure two-party deals with collat
 
 ### 🔒 Secure Deals
 - **Fairness Hold Collateral**: Any deal involving goods/services requires cash collateral (20% of declared value) to ensure both parties act in good faith
-- **Multiple Deal Types**: Cash↔Cash, Cash↔Goods/Service, Goods↔Goods
+- **Multiple Deal Types**: Money↔Money, Money↔Goods, Money↔Service, Goods↔Goods, Goods↔Service, Service↔Service
+- **Legs Model**: Flexible agreement structure where each side (legA/legB) can be MONEY, GOODS, or SERVICE
 - **Mutual Confirmation**: Both parties must agree on deal outcomes
 - **Dispute Freeze**: Freeze deals and enter dispute resolution
+- **Blocked Language Filter**: Prevents wagering, betting, and opposing position terminology
 
 ### 💳 Stripe Integration
 - **Stripe Checkout**: Secure payment processing
@@ -16,18 +18,34 @@ A production-ready static web application for secure two-party deals with collat
 - **Webhook Handlers**: Automated payment status updates
 - **Multiple Payment Types**: Setup fees, contributions, fairness holds, extension fees
 
+### 🏪 Marketplace
+- **Public Listings**: Browse available deals in a public marketplace
+- **Create Listings**: Post deals that anyone can join
+- **Join Deals**: One-click joining with automatic deal creation
+- **Language Validation**: All listings checked for blocked language
+
+### 💬 Per-Deal Chat
+- **Real-time Messaging**: Chat within each deal
+- **Message Validation**: Blocked language filtering on all messages
+- **Participant-Only**: Only deal participants can view and send messages
+- **No Global Chat**: Communication is strictly per-deal to maintain focus
+
 ### 📅 Deal Management
 - **Deal Dates**: Set completion deadlines with timezone support
 - **Past Due Tracking**: Automatic status updates when deals pass deadline
 - **Extensions**: Request and approve deal extensions with fees
 - **Invite Links**: Share unique, expiring invite tokens
+- **Status Timeline**: Visual stepper showing deal progress
 
 ### 🎨 Beautiful UI
 - **Premium Design**: Emerald/navy/gold color scheme
+- **Interactive Elements**: Hover effects, animations, confetti on completions
 - **Light/Dark/System Theme**: Fully themed with persistent preferences
 - **Responsive**: Mobile-first design
 - **Real-time Updates**: Live status changes via Firestore
 - **Audit Logs**: Complete action history for transparency
+- **Skeleton Loaders**: Smooth loading states
+- **Funding Checklist**: Visual payment progress tracker
 
 ### 🔔 Notifications
 - **In-app Notifications**: Deal updates, actions required, completions
@@ -53,6 +71,39 @@ A production-ready static web application for secure two-party deals with collat
 - **Zod**: Runtime schema validation
 - **ESLint**: Code quality
 
+## Safety & Compliance
+
+### 🚫 Blocked Language Policy
+MoneyGood enforces a strict language policy to prevent wagering, betting, and gambling-related activities:
+
+- **Pattern-Based Filtering**: Automatic detection of wagering terminology (bet, wager, odds, gamble, etc.)
+- **Opposing Position Detection**: Prevents agreements with opposing outcomes (A wins vs B wins)
+- **Paired Agreement Prevention**: No language suggesting linked or versus-style agreements
+- **Client & Server Validation**: Checked on both frontend (UX) and backend (security)
+
+**Where It's Enforced:**
+- Deal titles and descriptions
+- Marketplace listing titles and descriptions
+- Per-deal chat messages
+- Leg descriptions
+
+**Standalone Agreements Only:**
+All agreements must be independent and standalone. No automatic triggers, external event dependencies, linked agreements, or opposing outcomes are permitted.
+
+### ✅ Allowed Agreement Types
+- Money for goods delivery
+- Money for service completion
+- Goods exchange for other goods
+- Service exchange for other services
+- Collaborative agreements with mutual outcomes
+
+### ❌ Blocked Agreement Types
+- Wagers on external events
+- Betting on outcomes
+- Opposing position agreements ("A wins" vs "B wins")
+- Linked or paired agreements
+- Any gambling-related activities
+
 ## Project Structure
 
 ```
@@ -64,22 +115,29 @@ A production-ready static web application for secure two-party deals with collat
 ├── README.md                  # This file
 │
 ├── index.html                 # Main HTML (frontend in root for Cloudflare Pages)
-├── styles.css                 # Custom CSS + theme variables
-├── app.js                     # App entry point
+├── styles.css                 # Custom CSS + theme variables + animations
+├── app.js                     # App entry point with landing page
 ├── router.js                  # SPA hash router
 ├── firebase.js                # Firebase SDK initialization
 ├── api.js                     # Cloud Functions API wrapper
 ├── store.js                   # State management + localStorage
+├── blocked-language.js        # Wagering/betting language filter
 ├── _headers                   # Cloudflare Pages headers configuration
 ├── _routes.json               # Cloudflare Pages routing config (static asset exclusion)
 │
 ├── /ui                        # UI modules
-│   ├── components.js          # Reusable components
+│   ├── components.js          # Reusable components (timeline, checklist, skeletons, etc.)
 │   ├── auth.js                # Login/signup pages
 │   ├── dashboard.js           # Main dashboard
-│   ├── dealWizard.js          # Create deal flow
-│   ├── dealDetail.js          # Deal detail page
-│   └── settings.js            # Settings page
+│   ├── dealWizard.js          # Create deal flow with legs model
+│   ├── dealDetail.js          # Deal detail page with tabs (Details/Chat/Activity)
+│   ├── dealsList.js           # Deal listing view
+│   ├── marketplace.js         # Public marketplace feed
+│   ├── marketplaceNew.js      # Create marketplace listings
+│   ├── navigation.js          # Navigation components
+│   ├── notifications.js       # Notifications panel
+│   ├── settings.js            # Settings page
+│   └── account.js             # Account management
 │
 └── /firebase-functions        # Firebase Cloud Functions (NOT Cloudflare Pages Functions)
     ├── package.json           # Node dependencies
@@ -87,8 +145,11 @@ A production-ready static web application for secure two-party deals with collat
     └── /src
         ├── index.ts           # All callable functions + webhooks
         ├── stripe.ts          # Stripe helper functions
-        ├── validators.ts      # Zod schemas
-        └── dealMachine.ts     # Deal state machine logic
+        ├── validators.ts      # Zod schemas with legs model
+        ├── dealMachine.ts     # Deal state machine logic
+        ├── fees.ts            # Fee calculations
+        ├── notifications.ts   # Notification helpers
+        └── dealMachine.ts     # State machine with outcome_proposed/confirmed
 ```
 
 **Note on Routing:** This app uses **hash-based routing** (`#/app`, `#/deal/123`) which works perfectly with static hosting on Cloudflare Pages without needing server-side redirects. All navigation is client-side via the hash router.

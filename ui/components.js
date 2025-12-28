@@ -249,6 +249,7 @@ export function Navbar({ user }) {
           
           ${user ? `
             <div class="flex items-center gap-4">
+              <a href="#/marketplace" class="text-navy-700 dark:text-navy-300 hover:text-emerald-600">Marketplace</a>
               <a href="#/notifications" class="relative text-navy-700 dark:text-navy-300 hover:text-emerald-600">
                 <svg class="w-6 h-6" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
@@ -266,6 +267,7 @@ export function Navbar({ user }) {
             </div>
           ` : `
             <div class="flex items-center gap-4">
+              <a href="#/marketplace" class="text-navy-700 dark:text-navy-300 hover:text-emerald-600">Marketplace</a>
               <a href="#/login" class="text-navy-700 dark:text-navy-300 hover:text-emerald-600">Login</a>
               <a href="#/signup" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Sign Up</a>
             </div>
@@ -321,4 +323,224 @@ export function LoadingSpinner({ size = 'md', className = '' } = {}) {
       <div class="spinner ${sizes[size] || sizes.md}"></div>
     </div>
   `;
+}
+// Deal Status Timeline Stepper
+export function DealStatusTimeline({ currentStatus }) {
+  const statuses = [
+    { key: 'invited', label: 'Invited', icon: '📬' },
+    { key: 'awaiting_funding', label: 'Funding', icon: '💳' },
+    { key: 'active', label: 'Active', icon: '✅' },
+    { key: 'outcome_proposed', label: 'Proposed', icon: '📝' },
+    { key: 'confirmed', label: 'Confirmed', icon: '✓' },
+    { key: 'completed', label: 'Complete', icon: '🎉' }
+  ];
+  
+  // Handle special statuses
+  if (currentStatus === 'cancelled') {
+    return `
+      <div class="mb-6 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 text-center">
+        <span class="text-2xl">🚫</span>
+        <p class="text-sm font-semibold text-red-700 dark:text-red-300 mt-2">Agreement Cancelled</p>
+      </div>
+    `;
+  }
+  
+  if (currentStatus === 'frozen') {
+    return `
+      <div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 text-center">
+        <span class="text-2xl">❄️</span>
+        <p class="text-sm font-semibold text-blue-700 dark:text-blue-300 mt-2">Agreement Frozen (Dispute)</p>
+      </div>
+    `;
+  }
+  
+  // Find current step index
+  const currentIndex = statuses.findIndex(s => s.key === currentStatus);
+  
+  return `
+    <div class="mb-6 overflow-x-auto">
+      <div class="flex items-center justify-between min-w-max md:min-w-0 gap-2 px-2">
+        ${statuses.map((status, index) => {
+          const isPast = index < currentIndex;
+          const isCurrent = index === currentIndex;
+          const isFuture = index > currentIndex;
+          
+          let statusClass = '';
+          if (isPast) statusClass = 'bg-emerald-600 text-white border-emerald-600';
+          else if (isCurrent) statusClass = 'bg-gold-500 text-white border-gold-500 ring-4 ring-gold-200 dark:ring-gold-900';
+          else statusClass = 'bg-navy-100 dark:bg-navy-800 text-navy-400 dark:text-navy-500 border-navy-300 dark:border-navy-700';
+          
+          return `
+            <div class="flex flex-col items-center flex-1 relative">
+              ${index > 0 ? `
+                <div class="absolute top-4 right-1/2 w-full h-0.5 ${isPast ? 'bg-emerald-600' : 'bg-navy-200 dark:bg-navy-700'}" style="transform: translateX(50%);"></div>
+              ` : ''}
+              <div class="relative z-10 w-10 h-10 rounded-full border-2 ${statusClass} flex items-center justify-center text-lg mb-2 transition-all">
+                ${status.icon}
+              </div>
+              <span class="text-xs font-medium text-navy-700 dark:text-navy-300 text-center whitespace-nowrap">${status.label}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// Skeleton Loaders
+export function SkeletonCard({ count = 1 } = {}) {
+  return Array(count).fill(0).map(() => `
+    <div class="card p-6 animate-pulse">
+      <div class="flex items-center justify-between mb-4">
+        <div class="h-6 bg-navy-200 dark:bg-navy-700 rounded w-1/3"></div>
+        <div class="h-6 bg-navy-200 dark:bg-navy-700 rounded w-20"></div>
+      </div>
+      <div class="space-y-3">
+        <div class="h-4 bg-navy-200 dark:bg-navy-700 rounded w-full"></div>
+        <div class="h-4 bg-navy-200 dark:bg-navy-700 rounded w-5/6"></div>
+        <div class="h-4 bg-navy-200 dark:bg-navy-700 rounded w-4/6"></div>
+      </div>
+      <div class="mt-6 flex gap-4">
+        <div class="h-10 bg-navy-200 dark:bg-navy-700 rounded w-32"></div>
+        <div class="h-10 bg-navy-200 dark:bg-navy-700 rounded w-32"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+export function SkeletonList({ count = 3 } = {}) {
+  return Array(count).fill(0).map(() => `
+    <div class="card p-4 animate-pulse flex items-center gap-4">
+      <div class="w-12 h-12 bg-navy-200 dark:bg-navy-700 rounded-full"></div>
+      <div class="flex-1 space-y-2">
+        <div class="h-4 bg-navy-200 dark:bg-navy-700 rounded w-3/4"></div>
+        <div class="h-3 bg-navy-200 dark:bg-navy-700 rounded w-1/2"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Funding Checklist Component
+export function FundingChecklist({ deal, isCreator, userId }) {
+  const items = [];
+  
+  // Setup fees
+  items.push({
+    label: 'Setup Fee (You)',
+    completed: isCreator ? deal.setupFeePaidA : deal.setupFeePaidB,
+    amount: deal.setupFeeAmountCents || 0,
+    purpose: 'setup_fee',
+    required: true
+  });
+  
+  items.push({
+    label: 'Setup Fee (Other Party)',
+    completed: isCreator ? deal.setupFeePaidB : deal.setupFeePaidA,
+    amount: deal.setupFeeAmountCents || 0,
+    purpose: null, // Can't pay for other party
+    required: true
+  });
+  
+  // Contribution (if money involved)
+  if (deal.moneyAmountCents && deal.moneyAmountCents > 0) {
+    const creatorPaysContribution = deal.type?.includes('MONEY') || deal.legA?.kind === 'MONEY';
+    
+    if (isCreator && creatorPaysContribution) {
+      items.push({
+        label: 'Your Contribution',
+        completed: deal.contributionPaidA,
+        amount: deal.moneyAmountCents,
+        purpose: 'contribution',
+        required: true
+      });
+    } else if (!isCreator && !creatorPaysContribution) {
+      items.push({
+        label: 'Your Contribution',
+        completed: deal.contributionPaidB,
+        amount: deal.moneyAmountCents,
+        purpose: 'contribution',
+        required: true
+      });
+    }
+  }
+  
+  // Fairness holds (if goods/services involved)
+  if (deal.fairnessHoldAmountCentsA > 0) {
+    items.push({
+      label: 'Fairness Hold (You)',
+      completed: isCreator ? deal.fairnessHoldPaidA : deal.fairnessHoldPaidB,
+      amount: isCreator ? deal.fairnessHoldAmountCentsA : deal.fairnessHoldAmountCentsB,
+      purpose: 'fairness_hold',
+      required: true
+    });
+  }
+  
+  const allCompleted = items.every(item => !item.required || item.completed);
+  
+  return `
+    <div class="card p-6">
+      <h3 class="font-bold text-navy-900 dark:text-white mb-4 flex items-center gap-2">
+        <span>${allCompleted ? '✅' : '📋'}</span>
+        <span>Funding Checklist</span>
+      </h3>
+      
+      ${allCompleted ? `
+        <div class="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg mb-4">
+          <p class="text-sm text-emerald-700 dark:text-emerald-300 font-semibold">
+            ✓ All payment steps completed
+          </p>
+        </div>
+      ` : ''}
+      
+      <div class="space-y-3">
+        ${items.map(item => `
+          <div class="flex items-center justify-between p-3 ${item.completed ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-navy-50 dark:bg-navy-800'} rounded-lg">
+            <div class="flex items-center gap-3">
+              <div class="text-lg">${item.completed ? '✅' : '⏳'}</div>
+              <div>
+                <div class="font-medium text-navy-900 dark:text-white text-sm">${item.label}</div>
+                <div class="text-xs text-navy-600 dark:text-navy-400">${formatCurrency(item.amount)}</div>
+              </div>
+            </div>
+            ${item.purpose && !item.completed ? `
+              <button 
+                onclick="window.handlePayment('${deal.id}', '${item.purpose}')" 
+                class="px-3 py-1 bg-emerald-600 text-white text-sm rounded hover:bg-emerald-700 transition"
+              >
+                Pay Now
+              </button>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+      
+      <div class="mt-4 p-3 bg-navy-50 dark:bg-navy-800 rounded-lg">
+        <p class="text-xs text-navy-600 dark:text-navy-400">
+          <strong>Note:</strong> Payments are processed securely by Stripe. Setup fees support platform operations. Fairness holds ensure commitment.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+// Confetti Animation (CSS-based)
+export function showConfetti() {
+  const confettiHTML = `
+    <div id="confetti-container" class="fixed inset-0 pointer-events-none z-50">
+      ${Array(50).fill(0).map((_, i) => `
+        <div class="confetti" style="
+          left: ${Math.random() * 100}%;
+          animation-delay: ${Math.random() * 3}s;
+          background-color: ${['#10b981', '#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6'][Math.floor(Math.random() * 5)]};
+        "></div>
+      `).join('')}
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', confettiHTML);
+  
+  setTimeout(() => {
+    const container = document.getElementById('confetti-container');
+    if (container) container.remove();
+  }, 5000);
 }

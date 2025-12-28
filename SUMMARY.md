@@ -20,7 +20,11 @@ A **production-ready, full-stack web application** for secure two-party deals wi
 | **Invite Links** | ✅ Complete | Unique tokens with expiration |
 | **Dashboard** | ✅ Complete | Grouped by Needs Action/Active/Past Due/Frozen/Completed |
 | **Audit Log** | ✅ Complete | Complete action history per deal |
-| **Deal Types** | ✅ Complete | Cash↔Cash, Cash↔Goods, Goods↔Goods |
+| **Deal Types** | ✅ Complete | Money↔Money, Money↔Goods, Money↔Service, Goods↔Goods, Goods↔Service, Service↔Service |
+| **Legs Model** | ✅ Complete | Flexible structure with kind, description, declared value |
+| **Marketplace** | ✅ Complete | Public listing feed, create listings, join deals |
+| **Per-Deal Chat** | ✅ Complete | Real-time messaging with blocked language validation |
+| **Blocked Language** | ✅ Complete | Pattern-based filtering to prevent wagering terminology |
 | **Fairness Hold** | ✅ Complete | 20% collateral for goods/services |
 | **Stripe Payments** | ✅ Complete | Checkout + Connect + Webhooks |
 | **Mutual Confirm** | ✅ Complete | Propose + Confirm outcome flow |
@@ -31,7 +35,7 @@ A **production-ready, full-stack web application** for secure two-party deals wi
 | **Theme Toggle** | ✅ Complete | Light/Dark/System with persistence |
 | **Premium UI** | ✅ Complete | Emerald/navy/gold theme |
 
-**Score: 20/20 Requirements Met** ✅
+**Score: 24/24 Requirements Met** ✅
 
 ---
 
@@ -48,14 +52,21 @@ root directory/
 ├── router.js               Hash-based SPA router
 ├── firebase.js             Firebase SDK initialization
 ├── api.js                  Cloud Functions wrapper
+├── blocked-language.js     Wagering/betting language filter
 ├── store.js                State management
 └── ui/
     ├── components.js       Reusable UI components
     ├── auth.js             Login/Signup pages
     ├── dashboard.js        Main dashboard
-    ├── dealWizard.js       4-step deal creation
-    ├── dealDetail.js       Deal management page
-    └── settings.js         Settings with theme toggle
+    ├── dealWizard.js       4-step deal creation with legs model
+    ├── dealDetail.js       Deal management with chat
+    ├── dealsList.js        Deal listing view
+    ├── marketplace.js      Public marketplace feed
+    ├── marketplaceNew.js   Create marketplace listings
+    ├── navigation.js       Navigation components
+    ├── notifications.js    Notifications panel
+    ├── settings.js         Settings with theme toggle
+    └── account.js          Account management
 ```
 
 #### Backend (5 files)
@@ -90,7 +101,7 @@ firebase-functions/src/
 └── LICENSE                 MIT License
 ```
 
-**Total: 30 Files, ~4,000 Lines of Code**
+**Total: 36 Files, ~6,500 Lines of Code**
 
 ---
 
@@ -98,10 +109,11 @@ firebase-functions/src/
 
 ### 1. Landing Page
 - Hero section with value proposition
-- Feature showcase (6 key features)
-- How it works (4 steps)
-- Call-to-action buttons
-- Responsive design
+- Interactive deal type tiles (Money↔Money, Money↔Goods/Services, Goods↔Goods)
+- How it works timeline (5 visual steps)
+- Safety rails section (audit log, mutual confirmation, dispute freeze, language policy)
+- Example deals showcase (6 cards)
+- Responsive design with animations
 
 ### 2. Authentication
 - **Login Page**: Email/password form
@@ -120,20 +132,23 @@ firebase-functions/src/
 - Empty state for new users
 
 ### 4. Deal Wizard (4 Steps)
-- **Step 1**: Basic info (title, description, participant email)
-- **Step 2**: Deal type selection (cash/goods)
-- **Step 3**: Terms (amounts, goods description, values)
-- **Step 4**: Deal date, timezone, review & create
+- **Step 1**: Basic info (title, description, participant email) with blocked language validation
+- **Step 2**: Deal type selection (6 types: Money↔Money, Money↔Goods, Money↔Service, Goods↔Goods, Goods↔Service, Service↔Service)
+- **Step 3**: Legs configuration (dynamic fields based on kind - MONEY/GOODS/SERVICE)
+- **Step 4**: Deal date, timezone, review & create with confetti animation
 - Progress indicator
 - Back/Next navigation
 
 ### 5. Deal Detail
-- Deal information card
-- Status indicator
+- Deal information card with legs model display
+- Status timeline stepper (visual progress)
+- Tabbed interface (Details / Chat / Activity)
+- Funding checklist with payment status
 - Action buttons (propose, confirm, freeze, extend)
 - Invite link sharing
-- Payment status tracker
+- Real-time per-deal chat with blocked language validation
 - Audit log timeline
+- Confetti animation on completion
 - Responsive layout
 
 ### 6. Settings
@@ -148,6 +163,27 @@ firebase-functions/src/
 - Deal-specific alerts
 - Mark as read functionality
 - Empty state
+
+### 8. Marketplace
+- Public listing feed with search/filter
+- Deal type badges
+- Create listing button
+- Skeleton loaders for loading states
+- Responsive card grid
+
+### 9. Marketplace Listing Detail
+- Full listing information
+- Join button for authenticated users
+- Creator information
+- Deal type display
+- Created date
+
+### 10. Create Marketplace Listing
+- Title and description with blocked language validation
+- Deal type selector (6 types)
+- Tags input
+- Form validation
+- Success/error feedback
 
 ---
 
@@ -184,11 +220,11 @@ Client → Cloud Function → Validation → Business Logic → Firestore
 
 **11 Cloud Functions**:
 
-1. **createDeal** - Validate and create new deal
+1. **createDeal** - Validate and create new deal with legs model
 2. **acceptInvite** - Join deal via token
 3. **createCheckoutSession** - Generate Stripe payment URL
 4. **proposeOutcome** - Suggest deal resolution
-5. **confirmOutcome** - Approve and execute outcome
+5. **confirmOutcome** - Approve and execute outcome with confetti
 6. **freezeDeal** - Enter dispute mode
 7. **unfreezeDeal** - Resolve dispute
 8. **requestExtension** - Request more time
@@ -222,9 +258,13 @@ Client → Cloud Function → Validation → Business Logic → Firestore
   creatorUid, participantUid?, inviteToken,
   type, status, title, description,
   dealDate, timezone,
+  // Legacy fields (backward compatible)
   moneyAmountCents?, goodsA?, goodsB?,
   declaredValueA?, declaredValueB?,
-  fairnessHoldA, fairnessHoldB,
+  // New legs model
+  legA?: { kind: 'MONEY'|'GOODS'|'SERVICE', description, declaredValueCents, moneyAmountCents? },
+  legB?: { kind: 'MONEY'|'GOODS'|'SERVICE', description, declaredValueCents, moneyAmountCents? },
+  fairnessHoldAmountCentsA?, fairnessHoldAmountCentsB?,
   setupFeeCents, extensionFeesTotalCents,
   proposedOutcome?, outcomeConfirmed,
   createdAt, updatedAt
@@ -253,6 +293,19 @@ Client → Cloud Function → Validation → Business Logic → Firestore
 {
   type, title, message, dealId?,
   read, createdAt
+}
+
+// deals/{dealId}/messages/{messageId}
+{
+  text, senderUid, senderEmail,
+  createdAt
+}
+
+// listings/{listingId}
+{
+  title, description, type, tags,
+  status, createdByUid, createdByEmail,
+  createdAt, updatedAt
 }
 ```
 
@@ -464,7 +517,18 @@ Deploys:
 
 ## 🔄 Future Enhancements
 
-### Phase 2 (Optional)
+### Phase 2 (Recently Completed)
+- [x] Marketplace feature (public listings)
+- [x] Per-deal chat functionality
+- [x] Blocked language filtering
+- [x] Service agreements support
+- [x] Legs model architecture
+- [x] Enhanced landing page with interactive elements
+- [x] Status timeline stepper component
+- [x] Skeleton loaders for better UX
+- [x] Confetti animations for milestones
+
+### Phase 3 (Future Enhancements)
 - [ ] Multi-currency support
 - [ ] Email notification templates
 - [ ] Admin dashboard

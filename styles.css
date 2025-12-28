@@ -110,6 +110,41 @@ body {
   }
 }
 
+@keyframes bounceSlow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(-100vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounceSlow 3s ease-in-out infinite;
+}
+
 .animate-slide-in {
   animation: slideInRight 0.3s ease-out;
 }
@@ -126,10 +161,47 @@ body {
   animation: fadeOut 0.3s ease-out;
 }
 
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  animation: confettiFall 4s linear;
+  animation-fill-mode: forwards;
+}
+
 .skeleton {
   background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-border) 50%, var(--color-surface) 75%);
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
+}
+
+.timeline-step {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.interactive-tile {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.interactive-tile:hover {
+  transform: translateY(-8px) scale(1.02);
+}
+
+.hover\:scale-105:hover {
+  transform: scale(1.05);
 }
 
 /* Button hover effects */
@@ -178,10 +250,15 @@ body {
 .status-invited { background: #dbeafe; color: #1e40af; }
 .status-awaiting_funding { background: #fef3c7; color: #92400e; }
 .status-active { background: #d1fae5; color: #065f46; }
+.status-outcome_proposed { background: #fde68a; color: #78350f; }
+.status-confirmed { background: #d1fae5; color: #065f46; }
 .status-past_due { background: #fecaca; color: #991b1b; }
 .status-frozen { background: #e0e7ff; color: #3730a3; }
 .status-completed { background: #d1fae5; color: #065f46; }
 .status-cancelled { background: #f3f4f6; color: #6b7280; }
+.status-open { background: #dbeafe; color: #1e40af; }
+.status-matched { background: #d1fae5; color: #065f46; }
+.status-closed { background: #f3f4f6; color: #6b7280; }
 
 /* Loading spinner */
 .spinner {

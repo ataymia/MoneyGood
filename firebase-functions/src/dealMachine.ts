@@ -6,12 +6,27 @@ export type DealStatus =
   | 'invited'
   | 'awaiting_funding'
   | 'active'
+  | 'outcome_proposed'
+  | 'confirmed'
   | 'past_due'
   | 'frozen'
   | 'completed'
   | 'cancelled';
 
-export type DealType = 'CASH_CASH' | 'CASH_GOODS' | 'GOODS_GOODS';
+// Support both legacy and new type names
+export type DealType = 
+  | 'CASH_CASH' | 'CASH_GOODS' | 'GOODS_GOODS' // Legacy
+  | 'MONEY_MONEY' | 'MONEY_GOODS' | 'MONEY_SERVICE' | 'GOODS_SERVICE' | 'SERVICE_SERVICE'; // New
+
+// Map legacy types to new types
+export function normalizeDealType(type: string): DealType {
+  const mapping: Record<string, DealType> = {
+    'CASH_CASH': 'MONEY_MONEY',
+    'CASH_GOODS': 'MONEY_GOODS',
+    'GOODS_GOODS': 'GOODS_GOODS',
+  };
+  return (mapping[type] as DealType) || (type as DealType);
+}
 
 // Re-export fee calculations for backward compatibility
 // dealType parameter kept for API compatibility but not used (fees are fixed)
@@ -40,8 +55,10 @@ export function canTransitionTo(currentStatus: DealStatus, newStatus: DealStatus
     draft: ['invited', 'cancelled'],
     invited: ['awaiting_funding', 'cancelled'],
     awaiting_funding: ['active', 'cancelled'],
-    active: ['completed', 'past_due', 'frozen', 'cancelled'],
-    past_due: ['completed', 'frozen', 'active', 'cancelled'],
+    active: ['outcome_proposed', 'completed', 'past_due', 'frozen', 'cancelled'],
+    outcome_proposed: ['confirmed', 'active', 'frozen', 'cancelled'],
+    confirmed: ['completed', 'cancelled'],
+    past_due: ['outcome_proposed', 'completed', 'frozen', 'active', 'cancelled'],
     frozen: ['active', 'past_due', 'completed', 'cancelled'],
     completed: [],
     cancelled: [],
@@ -52,7 +69,7 @@ export function canTransitionTo(currentStatus: DealStatus, newStatus: DealStatus
 
 export function getNextStatus(
   currentStatus: DealStatus,
-  event: 'accept' | 'fund' | 'complete' | 'pastdue' | 'freeze' | 'unfreeze' | 'cancel'
+  event: 'accept' | 'fund' | 'propose_outcome' | 'confirm_outcome' | 'complete' | 'pastdue' | 'freeze' | 'unfreeze' | 'cancel'
 ): DealStatus | null {
   const eventTransitions: Record<string, Record<DealStatus, DealStatus | null>> = {
     accept: {
@@ -61,8 +78,16 @@ export function getNextStatus(
     fund: {
       awaiting_funding: 'active',
     } as Record<DealStatus, DealStatus | null>,
+    propose_outcome: {
+      active: 'outcome_proposed',
+      past_due: 'outcome_proposed',
+    } as Record<DealStatus, DealStatus | null>,
+    confirm_outcome: {
+      outcome_proposed: 'confirmed',
+    } as Record<DealStatus, DealStatus | null>,
     complete: {
       active: 'completed',
+      confirmed: 'completed',
       past_due: 'completed',
       frozen: 'completed',
     } as Record<DealStatus, DealStatus | null>,

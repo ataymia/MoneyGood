@@ -10,6 +10,8 @@ import { renderSettings } from './ui/settings.js';
 import { renderNotifications } from './ui/notifications.js';
 import { renderDealsList } from './ui/dealsList.js';
 import { renderAccount } from './ui/account.js';
+import { renderMarketplace, renderListingDetail } from './ui/marketplace.js';
+import { renderMarketplaceNew } from './ui/marketplaceNew.js';
 import { Navbar, showToast } from './ui/components.js';
 import { doc, setDoc, serverTimestamp, getDoc } from './firebase-mock.js';
 import { acceptInvite } from './api.js';
@@ -122,6 +124,9 @@ router.register('/deals', renderDealsList, true);
 router.register('/deal/new', renderDealWizard, true);
 router.register('/deal/:id', renderDealDetail, true);
 router.register('/join/:token', renderJoinDeal, false);
+router.register('/marketplace', renderMarketplace, false);
+router.register('/marketplace/new', renderMarketplaceNew, true);
+router.register('/marketplace/:id', renderListingDetail, false);
 router.register('/notifications', renderNotifications, true);
 router.register('/settings', renderSettings, true);
 router.register('/account', renderAccount, true);
@@ -145,23 +150,38 @@ function renderLanding() {
       <!-- Hero Section -->
       <section class="container mx-auto px-4 py-20">
         <div class="max-w-4xl mx-auto text-center">
-          <div class="text-6xl mb-6">💰</div>
+          <div class="text-6xl mb-6 animate-bounce-slow">💰</div>
           <h1 class="text-5xl md:text-6xl font-bold mb-6">
             <span class="gradient-text">MoneyGood</span>
           </h1>
           <p class="text-xl md:text-2xl text-navy-700 dark:text-navy-300 mb-8">
-            Secure two-party deals with collateral, payments, and dispute resolution
+            Conditional agreements and commitments with mutual confirmation
           </p>
           <div class="flex gap-4 justify-center flex-wrap">
             <a 
-              href="#/signup" 
-              class="btn-primary bg-emerald-600 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-emerald-700 transition shadow-glow"
+              href="#/deal/new" 
+              class="btn-primary bg-emerald-600 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-emerald-700 hover:scale-105 transition-all shadow-glow"
             >
-              Get Started Free
+              Create an Agreement
             </a>
             <a 
+              href="#/marketplace" 
+              class="btn-primary bg-gold-600 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-gold-700 hover:scale-105 transition-all shadow-glow"
+            >
+              Explore Marketplace
+            </a>
+          </div>
+          <div class="mt-6 flex gap-4 justify-center flex-wrap">
+            <a 
+              href="#/signup" 
+              class="text-emerald-600 hover:text-emerald-700 font-semibold"
+            >
+              Sign Up
+            </a>
+            <span class="text-navy-400">•</span>
+            <a 
               href="#/login" 
-              class="px-8 py-4 border-2 border-navy-300 dark:border-navy-600 text-navy-700 dark:text-navy-300 rounded-lg font-bold text-lg hover:bg-navy-50 dark:hover:bg-navy-800 transition"
+              class="text-emerald-600 hover:text-emerald-700 font-semibold"
             >
               Login
             </a>
@@ -169,119 +189,228 @@ function renderLanding() {
         </div>
       </section>
       
-      <!-- Features Section -->
-      <section class="container mx-auto px-4 py-20">
+      <!-- Interactive Agreement Types -->
+      <section class="container mx-auto px-4 py-12">
         <div class="max-w-6xl mx-auto">
-          <h2 class="text-3xl md:text-4xl font-bold text-center text-navy-900 dark:text-white mb-12">
-            Why Choose MoneyGood?
+          <h2 class="text-3xl md:text-4xl font-bold text-center text-navy-900 dark:text-white mb-4">
+            What can you create?
           </h2>
+          <p class="text-center text-navy-600 dark:text-navy-400 mb-12 max-w-2xl mx-auto">
+            MoneyGood supports flexible conditional agreements involving money, goods, and services
+          </p>
           
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div class="card text-center p-8">
-              <div class="text-4xl mb-4">🔒</div>
-              <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-3">Secure & Trustworthy</h3>
-              <p class="text-navy-600 dark:text-navy-400">
-                Fairness Hold collateral ensures both parties act in good faith
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="interactive-tile card p-8 text-center cursor-pointer hover:shadow-2xl hover:-translate-y-2 transition-all duration-300">
+              <div class="text-5xl mb-4">💵</div>
+              <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-3">Money ↔ Money</h3>
+              <p class="text-navy-600 dark:text-navy-400 text-sm">
+                Conditional payment agreements with mutual confirmation
               </p>
             </div>
             
-            <div class="card text-center p-8">
-              <div class="text-4xl mb-4">💳</div>
-              <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-3">Stripe Payments</h3>
-              <p class="text-navy-600 dark:text-navy-400">
-                Secure payments via Stripe with automatic fund transfers
+            <div class="interactive-tile card p-8 text-center cursor-pointer hover:shadow-2xl hover:-translate-y-2 transition-all duration-300">
+              <div class="text-5xl mb-4">💵📦</div>
+              <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-3">Money ↔ Goods/Services</h3>
+              <p class="text-navy-600 dark:text-navy-400 text-sm">
+                One party pays, other provides goods or services upon terms
               </p>
             </div>
             
-            <div class="card text-center p-8">
-              <div class="text-4xl mb-4">⚖️</div>
-              <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-3">Dispute Resolution</h3>
-              <p class="text-navy-600 dark:text-navy-400">
-                Freeze deals and resolve disputes with transparent audit logs
-              </p>
-            </div>
-            
-            <div class="card text-center p-8">
-              <div class="text-4xl mb-4">📅</div>
-              <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-3">Deal Deadlines</h3>
-              <p class="text-navy-600 dark:text-navy-400">
-                Set deal dates with automatic past-due tracking and extensions
-              </p>
-            </div>
-            
-            <div class="card text-center p-8">
-              <div class="text-4xl mb-4">🔔</div>
-              <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-3">Real-time Updates</h3>
-              <p class="text-navy-600 dark:text-navy-400">
-                Get notified about deal actions and status changes
-              </p>
-            </div>
-            
-            <div class="card text-center p-8">
-              <div class="text-4xl mb-4">🎨</div>
-              <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-3">Beautiful UI</h3>
-              <p class="text-navy-600 dark:text-navy-400">
-                Premium design with light/dark themes for the best experience
+            <div class="interactive-tile card p-8 text-center cursor-pointer hover:shadow-2xl hover:-translate-y-2 transition-all duration-300">
+              <div class="text-5xl mb-4">📦🤝</div>
+              <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-3">Goods ↔ Goods/Services</h3>
+              <p class="text-navy-600 dark:text-navy-400 text-sm">
+                Trade goods or services directly with structured terms
               </p>
             </div>
           </div>
         </div>
       </section>
       
-      <!-- How It Works -->
+      <!-- How It Works Timeline -->
       <section class="container mx-auto px-4 py-20">
         <div class="max-w-4xl mx-auto">
           <h2 class="text-3xl md:text-4xl font-bold text-center text-navy-900 dark:text-white mb-12">
             How It Works
           </h2>
           
-          <div class="space-y-8">
-            <div class="flex items-start gap-6">
-              <div class="flex-shrink-0 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xl">
-                1
+          <div class="relative">
+            <!-- Timeline line -->
+            <div class="absolute left-6 top-0 bottom-0 w-0.5 bg-emerald-200 dark:bg-emerald-800 hidden md:block"></div>
+            
+            <div class="space-y-12">
+              <div class="flex items-start gap-6 timeline-step">
+                <div class="flex-shrink-0 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xl z-10 shadow-lg">
+                  1
+                </div>
+                <div class="flex-1 card p-6">
+                  <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-2">Create or Join</h3>
+                  <p class="text-navy-600 dark:text-navy-400">
+                    Set up your agreement with clear terms, or browse the marketplace to join existing opportunities
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-2">Create a Deal</h3>
-                <p class="text-navy-600 dark:text-navy-400">
-                  Set up your deal with type (cash, goods, or both), amounts, and completion date
-                </p>
+              
+              <div class="flex items-start gap-6 timeline-step">
+                <div class="flex-shrink-0 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xl z-10 shadow-lg">
+                  2
+                </div>
+                <div class="flex-1 card p-6">
+                  <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-2">Invite/Accept</h3>
+                  <p class="text-navy-600 dark:text-navy-400">
+                    Share the invite link or accept an existing agreement. Both parties review terms.
+                  </p>
+                </div>
+              </div>
+              
+              <div class="flex items-start gap-6 timeline-step">
+                <div class="flex-shrink-0 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xl z-10 shadow-lg">
+                  3
+                </div>
+                <div class="flex-1 card p-6">
+                  <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-2">Fund (if needed)</h3>
+                  <p class="text-navy-600 dark:text-navy-400">
+                    Complete required payment steps via Stripe. Setup fees and optional fairness holds.
+                  </p>
+                </div>
+              </div>
+              
+              <div class="flex items-start gap-6 timeline-step">
+                <div class="flex-shrink-0 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xl z-10 shadow-lg">
+                  4
+                </div>
+                <div class="flex-1 card p-6">
+                  <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-2">Mutual Confirmation</h3>
+                  <p class="text-navy-600 dark:text-navy-400">
+                    Both parties confirm fulfillment. Dispute freeze available if needed.
+                  </p>
+                </div>
+              </div>
+              
+              <div class="flex items-start gap-6 timeline-step">
+                <div class="flex-shrink-0 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xl z-10 shadow-lg">
+                  5
+                </div>
+                <div class="flex-1 card p-6">
+                  <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-2">Complete</h3>
+                  <p class="text-navy-600 dark:text-navy-400">
+                    Agreement marked complete. Full audit log maintained for transparency.
+                  </p>
+                </div>
               </div>
             </div>
-            
-            <div class="flex items-start gap-6">
-              <div class="flex-shrink-0 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xl">
-                2
-              </div>
-              <div>
-                <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-2">Invite Partner</h3>
-                <p class="text-navy-600 dark:text-navy-400">
-                  Share the invite link with the other party to join the deal
-                </p>
-              </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Safety Rails Section -->
+      <section class="container mx-auto px-4 py-12 bg-white dark:bg-navy-800 bg-opacity-50">
+        <div class="max-w-6xl mx-auto">
+          <h2 class="text-3xl md:text-4xl font-bold text-center text-navy-900 dark:text-white mb-4">
+            Safety & Transparency
+          </h2>
+          <p class="text-center text-navy-600 dark:text-navy-400 mb-12 max-w-2xl mx-auto">
+            Every agreement is standalone and independent, with built-in safety features
+          </p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="text-center p-6">
+              <div class="text-4xl mb-3">📋</div>
+              <h3 class="font-bold text-navy-900 dark:text-white mb-2">Audit Log</h3>
+              <p class="text-sm text-navy-600 dark:text-navy-400">
+                Every action tracked with timestamps
+              </p>
             </div>
             
-            <div class="flex items-start gap-6">
-              <div class="flex-shrink-0 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xl">
-                3
-              </div>
-              <div>
-                <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-2">Fund the Deal</h3>
-                <p class="text-navy-600 dark:text-navy-400">
-                  Both parties pay setup fees and any required Fairness Hold collateral
-                </p>
-              </div>
+            <div class="text-center p-6">
+              <div class="text-4xl mb-3">✅</div>
+              <h3 class="font-bold text-navy-900 dark:text-white mb-2">Mutual Confirmation</h3>
+              <p class="text-sm text-navy-600 dark:text-navy-400">
+                Both parties must agree on outcomes
+              </p>
             </div>
             
-            <div class="flex items-start gap-6">
-              <div class="flex-shrink-0 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-xl">
-                4
-              </div>
-              <div>
-                <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-2">Complete & Confirm</h3>
-                <p class="text-navy-600 dark:text-navy-400">
-                  When ready, both parties agree on the outcome and funds are released
-                </p>
-              </div>
+            <div class="text-center p-6">
+              <div class="text-4xl mb-3">❄️</div>
+              <h3 class="font-bold text-navy-900 dark:text-white mb-2">Dispute Freeze</h3>
+              <p class="text-sm text-navy-600 dark:text-navy-400">
+                Pause agreement if issues arise
+              </p>
+            </div>
+            
+            <div class="text-center p-6">
+              <div class="text-4xl mb-3">🛡️</div>
+              <h3 class="font-bold text-navy-900 dark:text-white mb-2">Language Policy</h3>
+              <p class="text-sm text-navy-600 dark:text-navy-400">
+                Blocked language prevents wagering terms
+              </p>
+            </div>
+          </div>
+          
+          <div class="mt-8 p-6 bg-emerald-50 dark:bg-navy-900 rounded-lg border-l-4 border-emerald-600">
+            <p class="text-sm text-navy-700 dark:text-navy-300">
+              <strong>Important:</strong> MoneyGood supports standalone conditional agreements only. 
+              Agreements are independent and never paired as opposing positions. 
+              Payments are processed securely by Stripe.
+            </p>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Examples Section -->
+      <section class="container mx-auto px-4 py-20">
+        <div class="max-w-6xl mx-auto">
+          <h2 class="text-3xl md:text-4xl font-bold text-center text-navy-900 dark:text-white mb-12">
+            Example Agreements
+          </h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="card p-6 border-l-4 border-emerald-600">
+              <div class="text-3xl mb-3">💵</div>
+              <h4 class="font-bold text-navy-900 dark:text-white mb-2">Conditional Payment</h4>
+              <p class="text-sm text-navy-600 dark:text-navy-400">
+                "I'll pay $100 if X happens" — Clear conditions with mutual confirmation
+              </p>
+            </div>
+            
+            <div class="card p-6 border-l-4 border-gold-600">
+              <div class="text-3xl mb-3">📦</div>
+              <h4 class="font-bold text-navy-900 dark:text-white mb-2">Trade Agreement</h4>
+              <p class="text-sm text-navy-600 dark:text-navy-400">
+                "I'll trade my PS5 for a service by Friday" — Goods and services exchange
+              </p>
+            </div>
+            
+            <div class="card p-6 border-l-4 border-navy-600">
+              <div class="text-3xl mb-3">✅</div>
+              <h4 class="font-bold text-navy-900 dark:text-white mb-2">Proof-Based</h4>
+              <p class="text-sm text-navy-600 dark:text-navy-400">
+                "I'll pay upon proof of completion" — Evidence-based fulfillment
+              </p>
+            </div>
+            
+            <div class="card p-6 border-l-4 border-emerald-600">
+              <div class="text-3xl mb-3">🛠️</div>
+              <h4 class="font-bold text-navy-900 dark:text-white mb-2">Service Agreement</h4>
+              <p class="text-sm text-navy-600 dark:text-navy-400">
+                "I'll provide 5 hours of consulting for $500" — Service for payment
+              </p>
+            </div>
+            
+            <div class="card p-6 border-l-4 border-gold-600">
+              <div class="text-3xl mb-3">📅</div>
+              <h4 class="font-bold text-navy-900 dark:text-white mb-2">Time-Based</h4>
+              <p class="text-sm text-navy-600 dark:text-navy-400">
+                "I'll complete project by deadline or refund" — Deadline commitments
+              </p>
+            </div>
+            
+            <div class="card p-6 border-l-4 border-navy-600">
+              <div class="text-3xl mb-3">🤝</div>
+              <h4 class="font-bold text-navy-900 dark:text-white mb-2">Direct Exchange</h4>
+              <p class="text-sm text-navy-600 dark:text-navy-400">
+                "I'll trade camera gear for laptop" — Direct goods exchange
+              </p>
             </div>
           </div>
         </div>
@@ -294,20 +423,29 @@ function renderLanding() {
             Ready to Get Started?
           </h2>
           <p class="text-xl mb-8 opacity-90">
-            Join MoneyGood today and experience secure two-party deals
+            Create your first conditional agreement today
           </p>
-          <a 
-            href="#/signup" 
-            class="inline-block bg-white text-emerald-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition shadow-lg"
-          >
-            Create Your Free Account
-          </a>
+          <div class="flex gap-4 justify-center flex-wrap">
+            <a 
+              href="#/signup" 
+              class="inline-block bg-white text-emerald-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition shadow-lg"
+            >
+              Create Free Account
+            </a>
+            <a 
+              href="#/marketplace" 
+              class="inline-block bg-emerald-800 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-emerald-900 transition shadow-lg"
+            >
+              Browse Marketplace
+            </a>
+          </div>
         </div>
       </section>
       
       <!-- Footer -->
       <footer class="container mx-auto px-4 py-8 text-center text-navy-600 dark:text-navy-400">
         <p>&copy; 2024 MoneyGood. All rights reserved.</p>
+        <p class="text-sm mt-2">Conditional agreements platform • Not for wagering or paired outcomes</p>
       </footer>
     </div>
   `;
@@ -319,7 +457,9 @@ async function renderJoinDeal(params) {
   const { user } = store.getState();
   
   if (!user) {
-    showToast('Please login to join a deal', 'warning');
+    // Save intended destination
+    sessionStorage.setItem('joinToken', token);
+    showToast('Please login to join this agreement', 'warning');
     router.navigate('/login');
     return;
   }
@@ -328,24 +468,57 @@ async function renderJoinDeal(params) {
   content.innerHTML = `
     ${Navbar({ user })}
     <div class="min-h-screen bg-gradient-to-br from-emerald-50 to-navy-50 dark:from-navy-900 dark:to-navy-800 flex items-center justify-center p-4">
-      <div class="bg-white dark:bg-navy-800 rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
-        <div class="text-6xl mb-4">💰</div>
-        <h1 class="text-2xl font-bold text-navy-900 dark:text-white mb-4">Joining Deal...</h1>
-        <div class="flex justify-center">
-          <div class="spinner"></div>
+      <div class="bg-white dark:bg-navy-800 rounded-2xl shadow-2xl p-8 w-full max-w-2xl">
+        <div class="text-center">
+          <div class="text-6xl mb-4 animate-bounce-slow">🤝</div>
+          <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Join Agreement</h1>
+          <p class="text-navy-600 dark:text-navy-400 mb-6">Reviewing invitation details...</p>
+          <div class="flex justify-center">
+            ${Spinner({ size: 'lg' })}
+          </div>
         </div>
+        
+        <div id="join-preview" class="mt-6"></div>
       </div>
     </div>
   `;
   
   try {
+    // TODO: In real implementation, fetch deal preview by token first
+    // For now, just accept the invite
     const result = await acceptInvite(token);
-    showToast('Successfully joined the deal!', 'success');
-    router.navigate(`/deal/${result.dealId}`);
+    
+    // Show success state
+    document.getElementById('join-preview').innerHTML = `
+      <div class="p-6 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800 text-center">
+        <div class="text-4xl mb-3">✅</div>
+        <p class="font-bold text-emerald-900 dark:text-emerald-300 mb-2">Successfully Joined!</p>
+        <p class="text-sm text-emerald-800 dark:text-emerald-400">Redirecting to agreement details...</p>
+      </div>
+    `;
+    
+    showToast('Successfully joined the agreement!', 'success');
+    setTimeout(() => {
+      router.navigate(`/deal/${result.dealId}`);
+    }, 1500);
   } catch (error) {
-    console.error('Error joining deal:', error);
-    showToast(error.message || 'Failed to join deal', 'error');
-    router.navigate('/app');
+    console.error('Error joining agreement:', error);
+    
+    document.getElementById('join-preview').innerHTML = `
+      <div class="p-6 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 text-center">
+        <div class="text-4xl mb-3">❌</div>
+        <p class="font-bold text-red-900 dark:text-red-300 mb-2">Failed to Join</p>
+        <p class="text-sm text-red-800 dark:text-red-400 mb-4">${error.message || 'Invalid or expired invitation'}</p>
+        <button 
+          onclick="window.location.hash = '/app'" 
+          class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+        >
+          Go to Dashboard
+        </button>
+      </div>
+    `;
+    
+    showToast(error.message || 'Failed to join agreement', 'error');
   }
 }
 

@@ -110,8 +110,14 @@ export const createDeal = functions.https.onCall(async (data, context) => {
     goodsB: validated.goodsB || null,
     declaredValueA: validated.declaredValueA || null,
     declaredValueB: validated.declaredValueB || null,
+    // Store with both old and new field names for backward compatibility
     fairnessHoldA,
     fairnessHoldB,
+    fairnessHoldAmountCentsA: fairnessHoldA,
+    fairnessHoldAmountCentsB: fairnessHoldB,
+    // Add legs model fields if provided
+    legA: validated.legA || null,
+    legB: validated.legB || null,
     setupFeeCents,
     extensionFeesTotalCents: 0,
     inviteToken,
@@ -245,7 +251,9 @@ export const createCheckoutSession = functions.https.onCall(async (data, context
       break;
     case 'FAIRNESS_HOLD':
       const isCreator = deal.creatorUid === userId;
-      amountCents = isCreator ? deal.fairnessHoldA : deal.fairnessHoldB;
+      amountCents = isCreator 
+        ? (deal.fairnessHoldAmountCentsA || deal.fairnessHoldA || 0)
+        : (deal.fairnessHoldAmountCentsB || deal.fairnessHoldB || 0);
       description = 'Fairness Hold Collateral';
       break;
     case 'EXTENSION_FEE':

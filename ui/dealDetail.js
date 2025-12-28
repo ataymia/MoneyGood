@@ -1,6 +1,6 @@
 // Use mock Firebase for demo mode - switch back to '../firebase.js' when ready
-import { doc, getDoc, collection, query, orderBy, getDocs } from '../firebase-mock.js';
-import { Navbar, Card, formatCurrency, formatDate, showToast, showModal, Spinner } from './components.js';
+import { doc, getDoc, collection, query, orderBy, getDocs, addDoc, serverTimestamp } from '../firebase-mock.js';
+import { Navbar, Card, formatCurrency, formatDate, showToast, showModal, Spinner, DealStatusTimeline, FundingChecklist, showConfetti } from './components.js';
 import { 
   createCheckoutSession, 
   proposeOutcome, 
@@ -9,6 +9,7 @@ import {
   requestExtension 
 } from '../api.js';
 import { store } from '../store.js';
+import { containsBlockedLanguage, getBlockedLanguageMessage } from '../blocked-language.js';
 
 export async function renderDealDetail(params) {
   const { id: dealId } = params;
@@ -38,7 +39,7 @@ async function loadDeal(dealId, userId) {
     const dealDoc = await getDoc(doc(window.db, 'deals', dealId));
     
     if (!dealDoc.exists()) {
-      showToast('Deal not found', 'error');
+      showToast('Agreement not found', 'error');
       window.location.hash = '/app';
       return;
     }
@@ -52,14 +53,21 @@ async function loadDeal(dealId, userId) {
     const actions = [];
     actionsSnapshot.forEach(doc => actions.push({ id: doc.id, ...doc.data() }));
     
-    renderDealContent(deal, actions, userId);
+    // Load chat messages
+    const messagesRef = collection(window.db, 'deals', dealId, 'messages');
+    const messagesQuery = query(messagesRef, orderBy('createdAt', 'asc'));
+    const messagesSnapshot = await getDocs(messagesQuery);
+    const messages = [];
+    messagesSnapshot.forEach(doc => messages.push({ id: doc.id, ...doc.data() }));
+    
+    renderDealContent(deal, actions, messages, userId);
   } catch (error) {
-    console.error('Error loading deal:', error);
-    showToast('Failed to load deal', 'error');
+    console.error('Error loading agreement:', error);
+    showToast('Failed to load agreement', 'error');
   }
 }
 
-function renderDealContent(deal, actions, userId) {
+function renderDealContent(deal, actions, messages, userId) {
   const isCreator = deal.creatorUid === userId;
   const container = document.getElementById('deal-container');
   
@@ -74,30 +82,72 @@ function renderDealContent(deal, actions, userId) {
         ← Back to Dashboard
       </button>
       
+      ${DealStatusTimeline({ currentStatus: deal.status })}
+      
       <div class="flex items-start justify-between">
         <div>
-          <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">${deal.title || 'Untitled Deal'}</h1>
+          <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">${deal.title || 'Untitled Agreement'}</h1>
           <p class="text-navy-600 dark:text-navy-400">${deal.description || ''}</p>
         </div>
-        <span class="status-badge status-${deal.status}">${deal.status.replace('_', ' ')}</span>
       </div>
     </div>
     
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:col-span-2 space-y-6">
-        ${renderDealInfo(deal, isCreator)}
-        ${renderDealActions(deal, isCreator, userId)}
-        ${renderAuditLog(actions)}
+    <!-- Tabs -->
+    <div class="mb-6 border-b border-navy-200 dark:border-navy-700">
+      <div class="flex gap-4">
+        <button 
+          onclick="switchTab('details')" 
+          id="tab-details"
+          class="tab-button active px-4 py-2 font-semibold border-b-2 border-emerald-600 text-emerald-600"
+        >
+          Details
+        </button>
+        <button 
+          onclick="switchTab('chat')" 
+          id="tab-chat"
+          class="tab-button px-4 py-2 font-semibold border-b-2 border-transparent text-navy-600 dark:text-navy-400 hover:text-navy-900 dark:hover:text-white"
+        >
+          Chat ${messages.length > 0 ? `<span class="ml-1 text-xs bg-emerald-600 text-white rounded-full px-2">${messages.length}</span>` : ''}
+        </button>
+        <button 
+          onclick="switchTab('activity')" 
+          id="tab-activity"
+          class="tab-button px-4 py-2 font-semibold border-b-2 border-transparent text-navy-600 dark:text-navy-400 hover:text-navy-900 dark:hover:text-white"
+        >
+          Activity
+        </button>
       </div>
-      
-      <div class="space-y-6">
-        ${renderInviteCard(deal, inviteUrl)}
-        ${renderPaymentStatus(deal)}
+    </div>
+    
+    <!-- Tab Content -->
+    <div id="tab-content-details" class="tab-content">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6">
+          ${renderDealInfo(deal, isCreator)}
+          ${renderDealActions(deal, isCreator, userId)}
+        </div>
+        
+        <div class="space-y-6">
+          ${renderInviteCard(deal, inviteUrl)}
+          ${FundingChecklist({ deal, isCreator, userId })}
+        </div>
       </div>
+    </div>
+    
+    <div id="tab-content-chat" class="tab-content hidden">
+      ${renderChatTab(deal, messages, userId)}
+    </div>
+    
+    <div id="tab-content-activity" class="tab-content hidden">
+      ${renderAuditLog(actions)}
     </div>
   `;
   
-  // Store deal in window for action handlers
+  // Store deal and messages for handlers
+  window.currentDeal = deal;
+  window.currentMessages = messages;
+  window.currentUserId = userId;
+}
   window.currentDeal = deal;
   window.currentUserId = userId;
 }
@@ -108,16 +158,16 @@ function renderDealInfo(deal, isCreator) {
     : 'Not set';
   
   return Card({ 
-    title: 'Deal Information',
+    title: 'Agreement Information',
     children: `
-      <div class="space-y-3">
+      <div class="space-y-3 text-sm">
         <div class="flex justify-between">
           <span class="text-navy-600 dark:text-navy-400">Type:</span>
           <span class="font-semibold text-navy-900 dark:text-white">${formatDealType(deal.type)}</span>
         </div>
         <div class="flex justify-between">
           <span class="text-navy-600 dark:text-navy-400">Your Role:</span>
-          <span class="font-semibold text-navy-900 dark:text-white">${isCreator ? 'Creator' : 'Participant'}</span>
+          <span class="font-semibold text-navy-900 dark:text-white">${isCreator ? 'Creator (Side A)' : 'Participant (Side B)'}</span>
         </div>
         <div class="flex justify-between">
           <span class="text-navy-600 dark:text-navy-400">Creator:</span>
@@ -128,7 +178,7 @@ function renderDealInfo(deal, isCreator) {
           <span class="font-semibold text-navy-900 dark:text-white">${deal.participantEmail || 'Pending'}</span>
         </div>
         <div class="flex justify-between">
-          <span class="text-navy-600 dark:text-navy-400">Deal Date:</span>
+          <span class="text-navy-600 dark:text-navy-400">Date:</span>
           <span class="font-semibold text-navy-900 dark:text-white">${dealDate}</span>
         </div>
         ${deal.moneyAmountCents ? `
@@ -137,12 +187,42 @@ function renderDealInfo(deal, isCreator) {
             <span class="font-semibold text-emerald-600">${formatCurrency(deal.moneyAmountCents)}</span>
           </div>
         ` : ''}
-        ${deal.fairnessHoldAmount ? `
-          <div class="flex justify-between">
-            <span class="text-navy-600 dark:text-navy-400">Fairness Hold:</span>
-            <span class="font-semibold text-gold-600">${formatCurrency(deal.fairnessHoldAmount)}</span>
+        ${deal.fairnessHoldAmountCentsA > 0 || deal.fairnessHoldAmountCentsB > 0 ? `
+          <div class="mt-3 pt-3 border-t border-navy-200 dark:border-navy-700">
+            <div class="font-semibold text-navy-900 dark:text-white mb-2 text-sm">Fairness Holds:</div>
+            ${deal.fairnessHoldAmountCentsA > 0 ? `
+              <div class="flex justify-between">
+                <span class="text-navy-600 dark:text-navy-400">Side A (Creator):</span>
+                <span class="font-semibold text-gold-600">${formatCurrency(deal.fairnessHoldAmountCentsA)}</span>
+              </div>
+            ` : ''}
+            ${deal.fairnessHoldAmountCentsB > 0 ? `
+              <div class="flex justify-between">
+                <span class="text-navy-600 dark:text-navy-400">Side B (Participant):</span>
+                <span class="font-semibold text-gold-600">${formatCurrency(deal.fairnessHoldAmountCentsB)}</span>
+              </div>
+            ` : ''}
           </div>
         ` : ''}
+        ${deal.legA && deal.legB ? `
+          <div class="mt-3 pt-3 border-t border-navy-200 dark:border-navy-700">
+            <div class="font-semibold text-navy-900 dark:text-white mb-2 text-sm">Leg Details:</div>
+            <div class="space-y-2">
+              <div class="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded text-xs">
+                <div class="font-semibold text-emerald-800 dark:text-emerald-300">Side A:</div>
+                <div class="text-emerald-700 dark:text-emerald-400">${formatLegSummary(deal.legA)}</div>
+              </div>
+              <div class="p-2 bg-gold-50 dark:bg-gold-900/20 rounded text-xs">
+                <div class="font-semibold text-gold-800 dark:text-gold-300">Side B:</div>
+                <div class="text-gold-700 dark:text-gold-400">${formatLegSummary(deal.legB)}</div>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+      
+      <div class="mt-4 p-3 bg-navy-50 dark:bg-navy-800 rounded-lg text-xs text-navy-600 dark:text-navy-400">
+        <strong>Note:</strong> This is a standalone agreement. Payments processed by Stripe. Both parties must mutually confirm fulfillment.
       </div>
     `
   });
@@ -323,10 +403,158 @@ function formatDealType(type) {
   const types = {
     'CASH_CASH': 'Cash ↔ Cash',
     'CASH_GOODS': 'Cash ↔ Goods/Service',
-    'GOODS_GOODS': 'Goods ↔ Goods'
+    'GOODS_GOODS': 'Goods ↔ Goods',
+    'MONEY_MONEY': 'Money ↔ Money',
+    'MONEY_GOODS': 'Money ↔ Goods',
+    'MONEY_SERVICE': 'Money ↔ Service',
+    'GOODS_SERVICE': 'Goods ↔ Service',
+    'SERVICE_SERVICE': 'Service ↔ Service',
   };
   return types[type] || type;
 }
+
+function formatLegSummary(leg) {
+  if (!leg) return '';
+  
+  if (leg.kind === 'MONEY') {
+    return `$${((leg.moneyAmountCents || 0) / 100).toFixed(2)} payment`;
+  }
+  
+  if (leg.kind === 'GOODS') {
+    return `${leg.description || 'Goods'} (value: $${((leg.declaredValueCents || 0) / 100).toFixed(2)})`;
+  }
+  
+  if (leg.kind === 'SERVICE') {
+    return `${leg.description || 'Service'} (value: $${((leg.declaredValueCents || 0) / 100).toFixed(2)})`;
+  }
+  
+  return '';
+}
+
+// Chat Tab
+function renderChatTab(deal, messages, userId) {
+  return `
+    <div class="card p-6">
+      <h3 class="font-bold text-navy-900 dark:text-white mb-4">Agreement Chat</h3>
+      
+      <div id="chat-messages" class="space-y-3 max-h-96 overflow-y-auto mb-4 p-4 bg-navy-50 dark:bg-navy-900 rounded-lg">
+        ${messages.length === 0 ? `
+          <div class="text-center text-navy-600 dark:text-navy-400 py-8">
+            <div class="text-4xl mb-2">💬</div>
+            <p>No messages yet. Start the conversation!</p>
+          </div>
+        ` : messages.map(msg => renderChatMessage(msg, userId)).join('')}
+      </div>
+      
+      <form id="chat-form" class="flex gap-2">
+        <input 
+          type="text" 
+          id="chat-input" 
+          placeholder="Type your message..." 
+          class="flex-1"
+          required
+        />
+        <button 
+          type="submit" 
+          class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-semibold"
+        >
+          Send
+        </button>
+      </form>
+      
+      <div class="mt-3 text-xs text-navy-600 dark:text-navy-400">
+        <strong>Note:</strong> Messages are monitored for blocked language. Keep conversations professional and agreement-focused.
+      </div>
+    </div>
+  `;
+}
+
+function renderChatMessage(msg, currentUserId) {
+  const isOwn = msg.senderUid === currentUserId;
+  const timestamp = msg.createdAt?.seconds 
+    ? new Date(msg.createdAt.seconds * 1000).toLocaleTimeString()
+    : 'Just now';
+  
+  return `
+    <div class="flex ${isOwn ? 'justify-end' : 'justify-start'}">
+      <div class="max-w-xs ${isOwn ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-navy-100 dark:bg-navy-800'} rounded-lg p-3">
+        <div class="text-xs text-navy-600 dark:text-navy-400 mb-1">${isOwn ? 'You' : 'Other Party'} • ${timestamp}</div>
+        <div class="text-sm text-navy-900 dark:text-white whitespace-pre-wrap">${msg.text}</div>
+      </div>
+    </div>
+  `;
+}
+
+// Tab Switching
+window.switchTab = function(tabName) {
+  // Update buttons
+  document.querySelectorAll('.tab-button').forEach(btn => {
+    btn.classList.remove('active', 'border-emerald-600', 'text-emerald-600');
+    btn.classList.add('border-transparent', 'text-navy-600', 'dark:text-navy-400');
+  });
+  
+  document.getElementById(`tab-${tabName}`).classList.add('active', 'border-emerald-600', 'text-emerald-600');
+  document.getElementById(`tab-${tabName}`).classList.remove('border-transparent', 'text-navy-600', 'dark:text-navy-400');
+  
+  // Update content
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.classList.add('hidden');
+  });
+  
+  document.getElementById(`tab-content-${tabName}`).classList.remove('hidden');
+  
+  // Scroll chat to bottom if chat tab
+  if (tabName === 'chat') {
+    setTimeout(() => {
+      const chatMessages = document.getElementById('chat-messages');
+      if (chatMessages) {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+    }, 100);
+  }
+};
+
+// Chat form handler
+document.addEventListener('submit', async (e) => {
+  if (e.target.id === 'chat-form') {
+    e.preventDefault();
+    
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    
+    if (!text) return;
+    
+    // Check for blocked language
+    const check = containsBlockedLanguage(text);
+    if (check.blocked) {
+      showToast(getBlockedLanguageMessage(), 'error', 5000);
+      showToast(`Blocked terms: ${check.matches.join(', ')}`, 'warning', 5000);
+      return;
+    }
+    
+    try {
+      const deal = window.currentDeal;
+      const userId = window.currentUserId;
+      
+      const messagesRef = collection(window.db, 'deals', deal.id, 'messages');
+      await addDoc(messagesRef, {
+        text,
+        senderUid: userId,
+        createdAt: serverTimestamp()
+      });
+      
+      input.value = '';
+      showToast('Message sent', 'success');
+      
+      // Reload messages
+      setTimeout(() => window.location.reload(), 500);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      showToast('Failed to send message', 'error');
+    }
+  }
+});
+
 
 // Action handlers (global scope for onclick)
 window.copyInviteLink = async () => {
@@ -352,7 +580,17 @@ window.copyInviteLink = async () => {
 window.handlePayment = async (dealId, purpose) => {
   try {
     showToast('Creating checkout session...', 'info');
-    const result = await createCheckoutSession(dealId, purpose);
+    
+    // Map frontend purpose to backend expected format
+    const purposeMap = {
+      'setup_fee': 'SETUP_FEE',
+      'contribution': 'CONTRIBUTION',
+      'fairness_hold': 'FAIRNESS_HOLD'
+    };
+    
+    const backendPurpose = purposeMap[purpose] || purpose.toUpperCase();
+    
+    const result = await createCheckoutSession(dealId, backendPurpose);
     window.location.href = result.url;
   } catch (error) {
     showToast(error.message || 'Failed to create checkout session', 'error');
@@ -373,7 +611,13 @@ window.handleConfirmOutcome = async (dealId) => {
   try {
     await confirmOutcome(dealId);
     showToast('Outcome confirmed! Processing...', 'success');
-    window.location.reload();
+    
+    // Show confetti on completion
+    if (typeof showConfetti === 'function') {
+      showConfetti();
+    }
+    
+    setTimeout(() => window.location.reload(), 1000);
   } catch (error) {
     showToast(error.message || 'Failed to confirm outcome', 'error');
   }
