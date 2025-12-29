@@ -276,9 +276,8 @@ window.bootstrapAdmin = async () => {
     `;
     document.getElementById('bootstrap-form').classList.add('hidden');
     
-    // Sign out to refresh the token
-    const { signOut } = await import('./firebaseClient.js');
-    await signOut(window.firebaseAuth);
+    // Sign out to refresh the token - use the already-imported signOut and auth
+    await signOut(auth);
     
   } catch (error) {
     console.error('Bootstrap error:', error);
