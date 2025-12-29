@@ -32,6 +32,19 @@ import { renderTerms } from './ui/terms.js';
 import { Navbar, showToast } from './ui/components.js';
 import { acceptInvite } from './api.js';
 
+// Admin Modules
+import { renderAdminOverview } from './ui/admin/overview.js';
+import { renderAdminUsers } from './ui/admin/users.js';
+import { renderAdminAgreements } from './ui/admin/agreements.js';
+import { renderAdminMarketplace } from './ui/admin/marketplace.js';
+import { renderAdminPayments } from './ui/admin/payments.js';
+import { renderAdminSupport } from './ui/admin/support.js';
+import { renderAdminCases } from './ui/admin/cases.js';
+import { renderAdminModeration } from './ui/admin/moderation.js';
+import { renderAdminNotifications } from './ui/admin/notifications.js';
+import { renderAdminTemplates } from './ui/admin/templates.js';
+import { renderAdminAudit } from './ui/admin/audit.js';
+
 // Show blocking error UI if Firebase env vars are missing
 if (!firebaseReady) {
   showFirebaseConfigError();
@@ -57,7 +70,7 @@ onAuthStateChanged(auth, async (user) => {
     if (user) {
       store.setState({ user });
       
-      // Create/update user document
+      // Create/update user document and check account status
       try {
         const userRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userRef);
@@ -70,15 +83,33 @@ onAuthStateChanged(auth, async (user) => {
             theme: store.state.theme,
             emailNotifications: true,
             pushNotifications: true,
+            status: 'active',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
           });
+        } else {
+          // Check account status
+          const userData = userDoc.data();
+          if (userData.status === 'suspended') {
+            showToast('Your account has been suspended. Contact support for assistance.', 'error');
+            await signOut(auth);
+            renderAccountSuspended();
+            return;
+          } else if (userData.status === 'paused') {
+            showToast('Your account is paused. Some features may be limited.', 'warning');
+            store.setState({ accountPaused: true });
+          } else if (userData.status === 'deleted') {
+            showToast('This account has been deactivated.', 'error');
+            await signOut(auth);
+            router.navigate('/login');
+            return;
+          }
         }
       } catch (error) {
         console.error('Error creating user document:', error);
       }
     } else {
-      store.setState({ user: null });
+      store.setState({ user: null, accountPaused: false });
     }
     
     // Trigger initial route
@@ -103,6 +134,161 @@ router.register('/account', renderAccount, true);
 router.register('/templates', renderTemplates, false);
 router.register('/people', renderPeople, true);
 router.register('/terms', renderTerms, false);
+
+// Admin Routes - all require auth (admin check is done in each module)
+router.register('/admin', renderAdminOverview, true);
+router.register('/admin/overview', renderAdminOverview, true);
+router.register('/admin/users', renderAdminUsers, true);
+router.register('/admin/agreements', renderAdminAgreements, true);
+router.register('/admin/marketplace', renderAdminMarketplace, true);
+router.register('/admin/payments', renderAdminPayments, true);
+router.register('/admin/support', renderAdminSupport, true);
+router.register('/admin/cases', renderAdminCases, true);
+router.register('/admin/moderation', renderAdminModeration, true);
+router.register('/admin/notifications', renderAdminNotifications, true);
+router.register('/admin/templates', renderAdminTemplates, true);
+router.register('/admin/audit', renderAdminAudit, true);
+
+// Account suspended page
+function renderAccountSuspended() {
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="min-h-screen bg-gradient-to-br from-navy-900 to-navy-800 flex items-center justify-center p-4">
+      <div class="max-w-md w-full bg-white dark:bg-navy-800 rounded-2xl shadow-2xl p-8 text-center">
+        <div class="text-6xl mb-6">🚫</div>
+        <h1 class="text-2xl font-bold text-navy-900 dark:text-white mb-4">Account Suspended</h1>
+        <p class="text-navy-600 dark:text-navy-400 mb-6">
+          Your account has been suspended due to a violation of our terms of service or 
+          pending investigation. If you believe this is an error, please contact our support team.
+        </p>
+        <button 
+          onclick="showGetHelpModal()"
+          class="w-full px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold mb-4"
+        >
+          Contact Support
+        </button>
+        <a 
+          href="#/login" 
+          class="text-navy-500 hover:text-navy-700 text-sm"
+        >
+          Back to Login
+        </a>
+      </div>
+    </div>
+    ${GetHelpModal()}
+  `;
+}
+
+// Get Help Modal Component
+function GetHelpModal() {
+  return `
+    <div id="get-help-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center">
+      <div class="bg-white dark:bg-navy-800 rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold text-navy-900 dark:text-white">Get Help</h3>
+          <button onclick="hideGetHelpModal()" class="text-navy-500 hover:text-navy-700">✕</button>
+        </div>
+        <form id="help-form" onsubmit="submitHelpRequest(event)" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-navy-700 dark:text-navy-300 mb-1">Category</label>
+            <select id="help-category" required class="w-full px-3 py-2 rounded-lg border border-navy-200 dark:border-navy-600 bg-white dark:bg-navy-700">
+              <option value="">Select a category...</option>
+              <option value="account">Account Issue</option>
+              <option value="payment">Payment Problem</option>
+              <option value="deal">Deal Question</option>
+              <option value="marketplace">Marketplace Issue</option>
+              <option value="technical">Technical Problem</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-navy-700 dark:text-navy-300 mb-1">Subject</label>
+            <input 
+              type="text" 
+              id="help-subject"
+              required
+              placeholder="Brief description of your issue"
+              class="w-full px-3 py-2 rounded-lg border border-navy-200 dark:border-navy-600 bg-white dark:bg-navy-700"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-navy-700 dark:text-navy-300 mb-1">Description</label>
+            <textarea 
+              id="help-description"
+              required
+              rows="4"
+              placeholder="Please describe your issue in detail..."
+              class="w-full px-3 py-2 rounded-lg border border-navy-200 dark:border-navy-600 bg-white dark:bg-navy-700"
+            ></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-navy-700 dark:text-navy-300 mb-1">Related Deal ID (optional)</label>
+            <input 
+              type="text" 
+              id="help-deal-id"
+              placeholder="If this is about a specific deal"
+              class="w-full px-3 py-2 rounded-lg border border-navy-200 dark:border-navy-600 bg-white dark:bg-navy-700"
+            />
+          </div>
+          <button 
+            type="submit"
+            class="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold"
+          >
+            Submit Request
+          </button>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+// Global help modal functions
+window.showGetHelpModal = () => {
+  document.getElementById('get-help-modal')?.classList.remove('hidden');
+};
+
+window.hideGetHelpModal = () => {
+  document.getElementById('get-help-modal')?.classList.add('hidden');
+  document.getElementById('help-form')?.reset();
+};
+
+window.submitHelpRequest = async (event) => {
+  event.preventDefault();
+  
+  const category = document.getElementById('help-category')?.value;
+  const subject = document.getElementById('help-subject')?.value;
+  const description = document.getElementById('help-description')?.value;
+  const dealId = document.getElementById('help-deal-id')?.value || null;
+  
+  if (!category || !subject || !description) {
+    showToast('Please fill out all required fields', 'error');
+    return;
+  }
+  
+  try {
+    const { user } = store.getState();
+    const { addDoc, collection, serverTimestamp: ts } = await import('./firebaseClient.js');
+    
+    await addDoc(collection(db, 'supportTickets'), {
+      userUid: user?.uid || null,
+      userEmail: user?.email || 'anonymous',
+      category,
+      subject,
+      description,
+      dealId,
+      status: 'open',
+      priority: 'medium',
+      createdAt: ts(),
+      updatedAt: ts(),
+    });
+    
+    showToast('Support request submitted! We\'ll get back to you soon.', 'success');
+    hideGetHelpModal();
+  } catch (error) {
+    console.error('Error submitting help request:', error);
+    showToast('Failed to submit request. Please try again.', 'error');
+  }
+};
 
 // Marketplace auth gating wrapper
 function renderMarketplaceGated(params) {
@@ -421,6 +607,37 @@ window.handleLogout = async () => {
     showToast('Failed to logout', 'error');
   }
 };
+
+// Floating Get Help Button - inject once on load
+function injectFloatingHelpButton() {
+  // Don't add if already exists
+  if (document.getElementById('floating-help-btn')) return;
+  
+  const container = document.createElement('div');
+  container.id = 'floating-help-container';
+  container.innerHTML = `
+    <button 
+      id="floating-help-btn"
+      onclick="showGetHelpModal()"
+      class="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-700 transition-all hover:scale-105"
+      title="Get Help"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <span class="hidden sm:inline">Get Help</span>
+    </button>
+    ${GetHelpModal()}
+  `;
+  document.body.appendChild(container);
+}
+
+// Inject the help button when document is ready
+if (document.readyState === 'complete') {
+  injectFloatingHelpButton();
+} else {
+  window.addEventListener('load', injectFloatingHelpButton);
+}
 
 // Initialize app
 console.log('MoneyGood app initialized');

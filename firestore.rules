@@ -14,6 +14,11 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == uid;
     }
     
+    // Admin check using custom claims
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+    
     // Check if user is a deal participant using creatorUid/participantUid fields
     function isDealParticipant(dealData) {
       return isAuthenticated() && 
@@ -42,27 +47,49 @@ service cloud.firestore {
     // ============================================
     
     match /users/{uid} {
-      // Users can only read/write their own document
-      allow read: if isOwner(uid);
+      // Admin can read all users; users can only read their own
+      allow read: if isAdmin() || isOwner(uid);
+      
+      // Users can create their own profile
       allow create: if isOwner(uid);
-      allow update: if isOwner(uid) && 
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['stripeConnectAccountId', 'createdAt']);
+      
+      // Users can update their own profile (except protected fields)
+      // Admin can update any user profile
+      allow update: if isAdmin() || (isOwner(uid) && 
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['stripeConnectAccountId', 'createdAt', 'status', 'flagsCount', 'isAdmin']));
+      
+      // Delete only via Cloud Functions
       allow delete: if false;
-    }
-    
-    // User notifications - private to user
-    match /users/{uid}/notifications/{notificationId} {
-      allow read, write: if isOwner(uid);
-    }
-    
-    // User connections (favorites, recent partners) - private to user
-    match /users/{uid}/connections/{connectionId} {
-      allow read, write: if isOwner(uid);
-    }
-    
-    // User activity feed - private to user
-    match /users/{uid}/activityFeed/{eventId} {
-      allow read, write: if isOwner(uid);
+      
+      // ------------------------------------------
+      // USER SUBCOLLECTIONS
+      // ------------------------------------------
+      
+      // User notifications - private to user, admin can read/create
+      match /notifications/{notificationId} {
+        allow read: if isAdmin() || isOwner(uid);
+        allow create: if isAdmin() || isOwner(uid);
+        allow update: if isOwner(uid);
+        allow delete: if isOwner(uid);
+      }
+      
+      // User connections (favorites, recent partners) - private to user
+      match /connections/{connectionId} {
+        allow read: if isAdmin() || isOwner(uid);
+        allow write: if isOwner(uid);
+      }
+      
+      // User activity feed - private to user
+      match /activityFeed/{eventId} {
+        allow read: if isAdmin() || isOwner(uid);
+        allow write: if isOwner(uid);
+      }
+      
+      // Admin notes about user - admin only
+      match /adminNotes/{noteId} {
+        allow read, write: if isAdmin();
+      }
     }
     
     // ============================================
@@ -70,23 +97,19 @@ service cloud.firestore {
     // ============================================
     
     match /deals/{dealId} {
-      // READ: Allow if user is a participant (creator or participant)
-      // This supports queries like:
-      //   where('creatorUid', '==', uid)
-      //   where('participantUid', '==', uid)
-      //   where('participants', 'array-contains', uid)
-      allow read: if canAccessDeal(resource.data);
+      // Admin can read all deals; participants can read their own
+      allow read: if isAdmin() || canAccessDeal(resource.data);
       
       // CREATE: Only through Cloud Functions (to enforce validation + setup fees)
       allow create: if false;
       
-      // UPDATE: Participants can update non-sensitive fields only
-      // Sensitive fields (status, payments, tokens) are managed by Cloud Functions
-      allow update: if canAccessDeal(resource.data) && 
+      // UPDATE: Admin can update; participants can update non-sensitive fields only
+      allow update: if isAdmin() || (canAccessDeal(resource.data) && 
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['status', 'inviteToken', 'setupFeeCents', 'fairnessHoldA', 'fairnessHoldB', 
                    'extensionFeesTotalCents', 'stripeCheckoutSessionId', 'participantUid',
-                   'creatorUid', 'participants', 'createdAt']);
+                   'creatorUid', 'participants', 'createdAt', 'cancelledAt', 'cancelledBy',
+                   'adminNotes', 'adminFlags']));
       
       // DELETE: Not allowed (deals should be cancelled via Cloud Functions)
       allow delete: if false;
@@ -95,36 +118,36 @@ service cloud.firestore {
       // DEAL SUBCOLLECTIONS
       // ------------------------------------------
       
-      // Actions/Audit Log - read only for participants, write via Cloud Functions
+      // Actions/Audit Log - read only for participants/admin, write via Cloud Functions
       match /actions/{actionId} {
-        allow read: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow read: if isAdmin() || canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
         allow write: if false;
       }
       
-      // Payments - read only for participants, write via Cloud Functions  
+      // Payments - read only for participants/admin, write via Cloud Functions  
       match /payments/{paymentId} {
-        allow read: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow read: if isAdmin() || canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
         allow write: if false;
       }
       
-      // Disputes - read only for participants, write via Cloud Functions
+      // Disputes - read only for participants/admin, write via Cloud Functions
       match /dispute/{disputeId} {
-        allow read: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow read: if isAdmin() || canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
         allow write: if false;
       }
       
-      // Messages/Chat - participants can read and create messages
+      // Messages/Chat - participants can read and create messages, admin can read
       match /messages/{messageId} {
-        allow read: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow read: if isAdmin() || canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
         allow create: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data) &&
           request.resource.data.senderUid == request.auth.uid &&
           request.resource.data.keys().hasAll(['senderUid', 'senderEmail', 'text', 'createdAt']);
         allow update, delete: if false;
       }
       
-      // Events/Activity - participants can read and create events
+      // Events/Activity - participants can read and create events, admin can read
       match /events/{eventId} {
-        allow read: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow read: if isAdmin() || canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
         allow create: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data) &&
           request.resource.data.userId == request.auth.uid;
         allow update, delete: if false;
@@ -136,32 +159,137 @@ service cloud.firestore {
     // ============================================
     
     match /listings/{listingId} {
-      // READ: Any authenticated user can read any listing
-      // (Marketplace is auth-gated at the UI level)
-      // This is simpler and avoids query evaluation issues
-      allow read: if isAuthenticated();
+      // Admin can read all; authenticated users can read active listings
+      allow read: if isAdmin() || isAuthenticated();
       
       // CREATE: Authenticated users can create listings with required fields
       allow create: if isAuthenticated() &&
         request.resource.data.creatorUid == request.auth.uid &&
         request.resource.data.keys().hasAll(['title', 'description', 'type', 'creatorUid', 'status', 'createdAt']);
       
-      // UPDATE: Only the creator can update (except protected fields)
-      allow update: if isListingOwner(resource.data) &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['creatorUid', 'createdAt']);
+      // UPDATE: Admin can update all; owner can update (except protected fields)
+      allow update: if isAdmin() || (isListingOwner(resource.data) &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['creatorUid', 'createdAt', 'adminRemoved', 'moderationFlags']));
       
-      // DELETE: Only the creator can delete
-      allow delete: if isListingOwner(resource.data);
+      // DELETE: Admin or owner can delete
+      allow delete: if isAdmin() || isListingOwner(resource.data);
     }
     
     // ============================================
-    // TEMPLATES COLLECTION (if stored in Firestore)
+    // SUPPORT TICKETS COLLECTION
+    // ============================================
+    
+    match /supportTickets/{ticketId} {
+      // Admin can read all; users can read their own tickets
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userUid == request.auth.uid);
+      
+      // Users can create tickets for themselves
+      allow create: if isAuthenticated() && 
+        request.resource.data.userUid == request.auth.uid &&
+        request.resource.data.keys().hasAll(['userUid', 'userEmail', 'category', 'description', 'status', 'createdAt']);
+      
+      // Admin can update any ticket; users cannot update (only via functions)
+      allow update: if isAdmin();
+      
+      // No deletes
+      allow delete: if false;
+      
+      // Ticket messages subcollection
+      match /messages/{messageId} {
+        allow read: if isAdmin() || (isAuthenticated() && 
+          get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userUid == request.auth.uid);
+        allow create: if isAdmin() || (isAuthenticated() && 
+          get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userUid == request.auth.uid);
+        allow update, delete: if false;
+      }
+    }
+    
+    // ============================================
+    // CASES / INVESTIGATIONS COLLECTION (Admin only)
+    // ============================================
+    
+    match /cases/{caseId} {
+      allow read, write: if isAdmin();
+      
+      // Case notes subcollection
+      match /notes/{noteId} {
+        allow read, write: if isAdmin();
+      }
+      
+      // Case timeline subcollection
+      match /timeline/{eventId} {
+        allow read, write: if isAdmin();
+      }
+    }
+    
+    // ============================================
+    // MODERATION CONFIG COLLECTION (Admin only)
+    // ============================================
+    
+    match /moderationConfig/{docId} {
+      // Only admin can read/write moderation config
+      allow read, write: if isAdmin();
+    }
+    
+    // ============================================
+    // MODERATION FLAGS COLLECTION (Admin only)
+    // ============================================
+    
+    match /moderationFlags/{flagId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // ============================================
+    // AUDIT LOGS COLLECTION
+    // ============================================
+    
+    match /auditLogs/{logId} {
+      // Admin can read all audit logs
+      allow read: if isAdmin();
+      
+      // Write only via Cloud Functions (no direct writes)
+      allow write: if false;
+    }
+    
+    // ============================================
+    // PAYMENTS COLLECTION (Top-level for admin reporting)
+    // ============================================
+    
+    match /payments/{paymentId} {
+      // Admin can read all payments; deal participants can read their own
+      allow read: if isAdmin() || (isAuthenticated() && 
+        (resource.data.payerUid == request.auth.uid || 
+         resource.data.recipientUid == request.auth.uid));
+      
+      // Write only via Cloud Functions
+      allow write: if false;
+    }
+    
+    // ============================================
+    // TEMPLATES COLLECTION
     // ============================================
     
     match /templates/{templateId} {
-      // Templates are read-only for all authenticated users
+      // Templates are read-only for all authenticated users, admin can write
       allow read: if isAuthenticated();
-      // Write only via admin/Cloud Functions
+      allow write: if isAdmin();
+    }
+    
+    // ============================================
+    // ADMIN CONFIG COLLECTION (Admin only)
+    // ============================================
+    
+    match /adminConfig/{docId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // ============================================
+    // STATS / ANALYTICS COLLECTION (Admin read, Functions write)
+    // ============================================
+    
+    match /stats/{statId} {
+      allow read: if isAdmin();
       allow write: if false;
     }
   }

@@ -31,6 +31,28 @@ import {
 } from './feeConfig';
 // Notifications available in './notifications' module if needed
 
+// Export admin functions
+export {
+  adminSetUserStatus,
+  adminDeleteUser,
+  adminAddUserNote,
+  adminCancelDeal,
+  adminAddDealNote,
+  adminRemoveListing,
+  adminRestoreListing,
+  adminIssueRefund,
+  adminReplyToTicket,
+  adminCreateCase,
+  adminAddCaseNote,
+  adminUpdateCaseStatus,
+  adminSendNotification,
+  adminUpdateModerationConfig,
+  adminBootstrap,
+  adminGrantAccess,
+  adminRevokeAccess,
+  adminGetStats,
+} from './admin';
+
 admin.initializeApp();
 const db = admin.firestore();
 
