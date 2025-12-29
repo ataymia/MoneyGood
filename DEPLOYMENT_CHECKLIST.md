@@ -50,12 +50,14 @@ Follow these steps in order:
 - [ ] Installed dependencies: `cd firebase-functions && npm install`
 - [ ] Set Stripe secret key:
   ```bash
-  firebase functions:secrets:set STRIPE_SECRET_KEY
-  # Pasted sk_test_... or sk_live_...
+  firebase functions:config:set stripe.secret="sk_test_..."
+  # or for production: stripe.secret="sk_live_..."
   ```
 - [ ] Built functions: `npm run build`
 - [ ] Deployed functions: `firebase deploy --only functions`
 - [ ] Copied `stripeWebhook` function URL from deploy output
+
+**Note:** Using runtime config (`functions.config()`) to avoid billing requirements. This is scheduled for deprecation in March 2026 but works without enabling billing.
 
 ### 5. Stripe Webhook Configuration
 
@@ -71,9 +73,9 @@ Follow these steps in order:
 - [ ] Revealed and copied webhook signing secret (whsec_...)
 - [ ] Set webhook secret:
   ```bash
-  firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
-  # Pasted whsec_...
+  firebase functions:config:set stripe.webhook_secret="whsec_..."
   ```
+- [ ] Verified config: `firebase functions:config:get`
 - [ ] Redeployed webhook function: `firebase deploy --only functions:stripeWebhook`
 
 ### 6. Testing
@@ -96,9 +98,9 @@ Follow these steps in order:
 
 - [ ] Switched Stripe to **Live mode**
 - [ ] Updated `VITE_STRIPE_PUBLISHABLE_KEY` to `pk_live_...`
-- [ ] Updated `STRIPE_SECRET_KEY` to `sk_live_...`
+- [ ] Updated runtime config: `firebase functions:config:set stripe.secret="sk_live_..."`
 - [ ] Created new production webhook endpoint
-- [ ] Updated `STRIPE_WEBHOOK_SECRET` with production secret
+- [ ] Updated runtime config: `firebase functions:config:set stripe.webhook_secret="whsec_..."`
 - [ ] Tested with real card (refunded immediately)
 - [ ] Set up Firebase monitoring alerts
 - [ ] Set up Stripe dashboard alerts
@@ -117,13 +119,14 @@ Follow these steps in order:
 
 ### "Payment Checkout Fails"
 → Check Firebase Functions logs: `firebase functions:log`  
-→ Verify `STRIPE_SECRET_KEY` secret is set  
+→ Verify runtime config is set: `firebase functions:config:get`  
 → Ensure deal exists and user is participant
 
 ### "Webhook signature verification failed"
-→ Verify `STRIPE_WEBHOOK_SECRET` matches Stripe Dashboard  
+→ Verify webhook secret matches Stripe Dashboard  
+→ Check: `firebase functions:config:get`  
 → Check webhook endpoint URL matches deployed function  
-→ Redeploy functions after setting secret
+→ Redeploy functions after setting config
 
 ### "Deal doesn't activate after payment"
 → Check webhook logs in Stripe Dashboard  

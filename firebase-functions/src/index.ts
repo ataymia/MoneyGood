@@ -1,6 +1,5 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { onRequest } from 'firebase-functions/v2/https';
 import {
   CreateDealSchema,
   AcceptInviteSchema,
@@ -17,7 +16,6 @@ import {
   createConnectAccount,
   createAccountLink,
   constructWebhookEvent,
-  stripeWebhookSecret,
 } from './stripe';
 import {
   calculateSetupFee,
@@ -764,32 +762,33 @@ export const setupStripeConnect = functions.https.onCall(async (data, context) =
 });
 
 /**
- * Stripe webhook handler (v2 function with secrets)
+ * Stripe webhook handler (v1 function using runtime config)
  * Handles payment events: checkout.session.completed, payment_intent.payment_failed,
  * charge.refunded, charge.dispute.created
+ * 
+ * NOTE: Uses functions.config() instead of Secret Manager to avoid billing requirements.
+ * TODO: Migrate to Secret Manager after billing is enabled (before March 2026 deprecation).
  */
-export const stripeWebhook = onRequest(
-  { secrets: [stripeWebhookSecret] },
-  async (req, res) => {
-    const sig = req.headers['stripe-signature'] as string;
+export const stripeWebhook = functions.https.onRequest(async (req, res) => {
+  const sig = req.headers['stripe-signature'] as string;
 
-    if (!sig) {
-      console.error('Missing stripe-signature header');
-      res.status(400).send('Missing signature');
-      return;
-    }
+  if (!sig) {
+    console.error('Missing stripe-signature header');
+    res.status(400).send('Missing signature');
+    return;
+  }
 
-    let event;
+  let event;
 
-    try {
-      event = constructWebhookEvent(req.rawBody, sig);
-    } catch (err: any) {
-      console.error('Webhook signature verification failed:', err.message);
-      res.status(400).send(`Webhook Error: ${err.message}`);
-      return;
-    }
+  try {
+    event = constructWebhookEvent(req.rawBody, sig);
+  } catch (err: any) {
+    console.error('Webhook signature verification failed:', err.message);
+    res.status(400).send(`Webhook Error: ${err.message}`);
+    return;
+  }
 
-    try {
+  try {
       switch (event.type) {
         case 'checkout.session.completed':
           await handleCheckoutCompleted(event.data.object);
@@ -816,8 +815,7 @@ export const stripeWebhook = onRequest(
       console.error('Error processing webhook:', error);
       res.status(500).send('Webhook processing failed');
     }
-  }
-);
+  });
 
 /**
  * Handle successful checkout session completion

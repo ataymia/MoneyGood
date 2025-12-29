@@ -48,16 +48,18 @@ Successfully implemented complete Stripe + Firebase integration using environmen
 - `/workspaces/MoneyGood/firebase-functions/src/index.ts`
 
 ✅ **Stripe Module Updates:**
-- Uses Firebase Functions v2 `defineSecret` for secrets management
+- Uses Firebase Functions runtime config (`functions.config()`) for credentials
+- Runtime config values (must be set via Firebase CLI):
+  - `stripe.secret` (sk_test_* or sk_live_*)
+  - `stripe.webhook_secret` (whsec_*)
 - Lazy initialization of Stripe SDK to avoid errors
-- Secrets (must be set via Firebase CLI):
-  - `STRIPE_SECRET_KEY` (sk_test_* or sk_live_*)
-  - `STRIPE_WEBHOOK_SECRET` (whsec_*)
+- **Note:** Using runtime config instead of Secret Manager to avoid billing requirements
+- Runtime config is [scheduled for deprecation in March 2026](https://firebase.google.com/docs/functions/config-env)
 - Enhanced `createCheckoutSession` to include `payerUid` in metadata
-- Updated `constructWebhookEvent` to use secret from Firebase params
+- Updated `constructWebhookEvent` to use runtime config
 
 ✅ **Enhanced Webhook Handler (`stripeWebhook`):**
-- Upgraded to Firebase Functions v2 with secrets support
+- Uses v1 Firebase Functions (`functions.https.onRequest`) to avoid Secret Manager billing
 - Event handlers for:
   - `checkout.session.completed` — Update payment status and deal flags
   - `payment_intent.payment_failed` — Mark payment as failed
@@ -322,10 +324,10 @@ npm install
 npm run build
 firebase deploy --only functions
 
-# Firebase Secrets
-firebase functions:secrets:set STRIPE_SECRET_KEY
-firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
-firebase functions:secrets:access STRIPE_SECRET_KEY
+# Firebase Runtime Config
+firebase functions:config:set stripe.secret="sk_..."
+firebase functions:config:set stripe.webhook_secret="whsec_..."
+firebase functions:config:get
 
 # Firebase Logs
 firebase functions:log
@@ -377,7 +379,9 @@ firebase functions:log --only stripeWebhook
 1. ✅ **Review this implementation** — All code is commit-ready
 2. 📘 **Follow [STRIPE_FIREBASE_SETUP.md](./STRIPE_FIREBASE_SETUP.md)** step-by-step
 3. 🔑 **Set environment variables** in Cloudflare Pages dashboard
-4. 🔐 **Set Firebase secrets** via CLI (`firebase functions:secrets:set`)
+4. 🔐 **Set Firebase runtime config** via CLI:
+   - `firebase functions:config:set stripe.secret="sk_..."`
+   - `firebase functions:config:set stripe.webhook_secret="whsec_..."`
 5. 🚀 **Deploy functions** (`firebase deploy --only functions`)
 6. 🔗 **Configure Stripe webhook** with deployed function URL
 7. 🧪 **Test payment flow** end-to-end with test cards

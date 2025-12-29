@@ -204,11 +204,13 @@ The guide covers:
    VITE_STRIPE_PUBLISHABLE_KEY
    ```
 
-2. **Set Firebase secrets for Cloud Functions:**
+2. **Set Firebase runtime config for Cloud Functions:**
    ```bash
-   firebase functions:secrets:set STRIPE_SECRET_KEY
-   firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+   firebase functions:config:set stripe.secret="sk_test_..."
+   firebase functions:config:set stripe.webhook_secret="whsec_..."
    ```
+
+   **Note:** Using runtime config to avoid billing requirements. This is scheduled for deprecation in March 2026 but works without enabling billing. Consider migrating to Secret Manager or environment variables before then.
 
 3. **Deploy Firebase Functions:**
    ```bash

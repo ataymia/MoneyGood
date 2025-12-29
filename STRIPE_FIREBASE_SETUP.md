@@ -178,25 +178,31 @@ firebase init functions
 
 The `firebase-functions/` folder is already set up.
 
-### 4.4 Set Firebase Secrets (Stripe Keys)
+### 4.4 Set Stripe Runtime Config
 
-Firebase Functions v2 uses **secrets** for sensitive data (not environment variables).
-
-Set secrets:
+Firebase Functions uses runtime configuration for secrets. Set your Stripe keys:
 
 ```bash
-firebase functions:secrets:set STRIPE_SECRET_KEY
-# Paste your sk_test_... or sk_live_... key when prompted
+# Set Stripe secret key (from Stripe Dashboard → API Keys)
+firebase functions:config:set stripe.secret="sk_test_..." 
+# or for production: stripe.secret="sk_live_..."
 
-firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
-# We'll set this after creating the webhook (Part 5)
+# Set Stripe webhook secret (you'll get this in Part 5 after creating the webhook)
+firebase functions:config:set stripe.webhook_secret="whsec_..."
 ```
 
-Verify secrets:
+Verify config:
 
 ```bash
-firebase functions:secrets:access STRIPE_SECRET_KEY
+firebase functions:config:get
 ```
+
+**Important Notes:**
+- Runtime config (`functions.config()`) is being used instead of Secret Manager to avoid billing requirements
+- This method works without enabling billing on your Firebase project
+- Runtime config is [scheduled for deprecation in March 2026](https://firebase.google.com/docs/functions/config-env)
+- **TODO:** Migrate to Secret Manager or environment variables before deprecation
+- For now, this is the recommended approach for projects without billing enabled
 
 ### 4.5 Install Dependencies
 
@@ -255,11 +261,17 @@ Example output:
 ### 5.3 Set Webhook Secret in Firebase
 
 ```bash
-firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
-# Paste whsec_... when prompted
+firebase functions:config:set stripe.webhook_secret="whsec_..."
+# Paste the webhook secret you copied
 ```
 
-### 5.4 Redeploy Functions (to use new secret)
+Verify config:
+
+```bash
+firebase functions:config:get
+```
+
+### 5.4 Redeploy Functions (to use new config)
 
 ```bash
 firebase deploy --only functions:stripeWebhook

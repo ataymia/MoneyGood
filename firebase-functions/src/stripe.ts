@@ -1,20 +1,48 @@
 import Stripe from 'stripe';
-import { defineSecret } from 'firebase-functions/params';
+import * as functions from 'firebase-functions';
 
-// Define secrets using Firebase Functions v2 secrets management
-// These must be set via: firebase functions:secrets:set STRIPE_SECRET_KEY
-export const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
-export const stripeWebhookSecret = defineSecret('STRIPE_WEBHOOK_SECRET');
+/**
+ * Get Stripe secret key from runtime config
+ * Set via: firebase functions:config:set stripe.secret="sk_..."
+ */
+function getStripeSecretKey(): string {
+  const config = functions.config();
+  const secretKey = config.stripe?.secret;
+  
+  if (!secretKey) {
+    throw new Error(
+      'Stripe secret key not configured. ' +
+      'Set it with: firebase functions:config:set stripe.secret="sk_..."'
+    );
+  }
+  
+  return secretKey;
+}
 
-// Initialize Stripe lazily to avoid errors when secrets aren't loaded
+/**
+ * Get Stripe webhook secret from runtime config
+ * Set via: firebase functions:config:set stripe.webhook_secret="whsec_..."
+ */
+function getStripeWebhookSecret(): string {
+  const config = functions.config();
+  const webhookSecret = config.stripe?.webhook_secret;
+  
+  if (!webhookSecret) {
+    throw new Error(
+      'Stripe webhook secret not configured. ' +
+      'Set it with: firebase functions:config:set stripe.webhook_secret="whsec_..."'
+    );
+  }
+  
+  return webhookSecret;
+}
+
+// Initialize Stripe lazily to avoid errors when config isn't loaded
 let stripeInstance: Stripe | null = null;
 
 export function getStripe(): Stripe {
   if (!stripeInstance) {
-    const secretKey = stripeSecretKey.value();
-    if (!secretKey) {
-      throw new Error('STRIPE_SECRET_KEY secret is not configured');
-    }
+    const secretKey = getStripeSecretKey();
     stripeInstance = new Stripe(secretKey, {
       apiVersion: '2023-10-16',
     });
@@ -130,11 +158,7 @@ export function constructWebhookEvent(
   signature: string
 ): Stripe.Event {
   const stripe = getStripe();
-  const secret = stripeWebhookSecret.value();
-  
-  if (!secret) {
-    throw new Error('STRIPE_WEBHOOK_SECRET secret is not configured');
-  }
+  const secret = getStripeWebhookSecret();
   
   return stripe.webhooks.constructEvent(payload, signature, secret);
 }

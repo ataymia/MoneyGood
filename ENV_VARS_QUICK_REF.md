@@ -21,21 +21,24 @@ VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...  # or pk_live_... for production
 
 ---
 
-## Backend (Firebase Cloud Functions) — Secrets
+## Backend (Firebase Cloud Functions) — Runtime Config
 
 Set these via **Firebase CLI** (NOT in Cloudflare):
 
 ```bash
 # Stripe Secret Key (from Stripe Dashboard → API Keys)
-firebase functions:secrets:set STRIPE_SECRET_KEY
-# Paste: sk_test_... (for testing) or sk_live_... (for production)
+firebase functions:config:set stripe.secret="sk_test_..."
+# For production: stripe.secret="sk_live_..."
 
 # Stripe Webhook Secret (from Stripe Dashboard → Webhooks → Endpoint)
-firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
-# Paste: whsec_...
+firebase functions:config:set stripe.webhook_secret="whsec_..."
 ```
 
-**Note:** These are server-only secrets, never exposed to the frontend.
+**Note:** 
+- These are server-only secrets, never exposed to the frontend
+- Using `functions.config()` to avoid billing requirements (Secret Manager needs billing)
+- Runtime config is [scheduled for deprecation in March 2026](https://firebase.google.com/docs/functions/config-env)
+- Consider migrating to Secret Manager or environment variables before then
 
 ---
 
@@ -65,10 +68,19 @@ Run: `npm run dev` (Vite automatically loads `.env`)
 2. Look for: `✅ Firebase initialized successfully from environment variables`
 3. Look for: `✅ Stripe initialized successfully from environment variables`
 
-### Check Backend Secrets
+### Check Backend Config
 ```bash
-firebase functions:secrets:access STRIPE_SECRET_KEY
-firebase functions:secrets:access STRIPE_WEBHOOK_SECRET
+firebase functions:config:get
+```
+
+You should see:
+```json
+{
+  "stripe": {
+    "secret": "sk_test_...",
+    "webhook_secret": "whsec_..."
+  }
+}
 ```
 
 ### Check Deployment
@@ -85,11 +97,12 @@ firebase functions:log
 ## Quick Commands
 
 ```bash
-# Set secret
-firebase functions:secrets:set SECRET_NAME
+# Set runtime config
+firebase functions:config:set stripe.secret="sk_..."
+firebase functions:config:set stripe.webhook_secret="whsec_..."
 
-# View secret value
-firebase functions:secrets:access SECRET_NAME
+# View config
+firebase functions:config:get
 
 # Deploy functions
 cd firebase-functions
@@ -108,8 +121,8 @@ firebase functions:log --only stripeWebhook
 |----------------|--------|
 | `VITE_FIREBASE_*` | [Firebase Console](https://console.firebase.google.com) → Project Settings → Your apps → Web app config |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | [Stripe Dashboard](https://dashboard.stripe.com) → Developers → API keys → Publishable key |
-| `STRIPE_SECRET_KEY` | [Stripe Dashboard](https://dashboard.stripe.com) → Developers → API keys → Secret key |
-| `STRIPE_WEBHOOK_SECRET` | [Stripe Dashboard](https://dashboard.stripe.com) → Developers → Webhooks → [Your endpoint] → Signing secret |
+| `stripe.secret` | [Stripe Dashboard](https://dashboard.stripe.com) → Developers → API keys → Secret key |
+| `stripe.webhook_secret` | [Stripe Dashboard](https://dashboard.stripe.com) → Developers → Webhooks → [Your endpoint] → Signing secret |
 
 ---
 
@@ -119,9 +132,9 @@ Before going live:
 
 - [ ] Switch Stripe to **Live mode** (toggle in Stripe Dashboard)
 - [ ] Update `VITE_STRIPE_PUBLISHABLE_KEY` to `pk_live_...`
-- [ ] Update `STRIPE_SECRET_KEY` secret to `sk_live_...`
+- [ ] Update runtime config: `firebase functions:config:set stripe.secret="sk_live_..."`
 - [ ] Create new webhook endpoint for production
-- [ ] Update `STRIPE_WEBHOOK_SECRET` with new production secret
+- [ ] Update runtime config: `firebase functions:config:set stripe.webhook_secret="whsec_..."`
 - [ ] Test payment flow with real card (then refund)
 - [ ] Monitor Firebase Functions logs
 - [ ] Monitor Stripe Dashboard for successful payments
