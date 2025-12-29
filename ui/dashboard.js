@@ -109,44 +109,76 @@ async function loadActivityFeed(userId) {
 async function loadDeals(userId) {
   try {
     const dealsRef = collection(window.db, 'deals');
+    let deals = [];
     
-    // Query for deals where user is creator or participant
-    const creatorQuery = query(
-      dealsRef,
-      where('creatorUid', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-    
-    const participantQuery = query(
-      dealsRef,
-      where('participantUid', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-    
-    const [creatorSnapshot, participantSnapshot] = await Promise.all([
-      getDocs(creatorQuery),
-      getDocs(participantQuery)
-    ]);
-    
-    const deals = [];
-    creatorSnapshot.forEach(doc => deals.push({ id: doc.id, ...doc.data() }));
-    participantSnapshot.forEach(doc => {
-      if (!deals.find(d => d.id === doc.id)) {
-        deals.push({ id: doc.id, ...doc.data() });
-      }
-    });
-    
-    // Sort deals by created date
-    deals.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds);
+    try {
+      // Primary query: Use participants array (efficient, supports new schema)
+      const participantsQuery = query(
+        dealsRef,
+        where('participants', 'array-contains', userId),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const snapshot = await getDocs(participantsQuery);
+      deals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (participantsError) {
+      console.warn('participants query failed, trying fallback:', participantsError.message);
+      
+      // Fallback: Query by creatorUid OR participantUid (for legacy deals)
+      const creatorQuery = query(
+        dealsRef,
+        where('creatorUid', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const participantQuery = query(
+        dealsRef,
+        where('participantUid', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const [creatorSnapshot, participantSnapshot] = await Promise.all([
+        getDocs(creatorQuery),
+        getDocs(participantQuery)
+      ]);
+      
+      const dealsMap = new Map();
+      creatorSnapshot.docs.forEach(doc => dealsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+      participantSnapshot.docs.forEach(doc => {
+        if (!dealsMap.has(doc.id)) {
+          dealsMap.set(doc.id, { id: doc.id, ...doc.data() });
+        }
+      });
+      
+      deals = Array.from(dealsMap.values());
+      // Sort deals by created date
+      deals.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    }
     
     store.setState({ deals });
     renderDealsGrouped(deals, userId);
   } catch (error) {
     console.error('Error loading deals:', error);
-    showToast('Failed to load deals', 'error');
+    
+    // User-friendly error messages
+    let errorMessage = 'Unable to load your agreements.';
+    if (error.code === 'permission-denied') {
+      errorMessage = 'Create your first agreement or ask someone to send you an invite link!';
+    }
+    
     document.getElementById('deals-container').innerHTML = `
-      <div class="text-center py-12 text-navy-600 dark:text-navy-400">
-        <p>Failed to load deals. Please try again.</p>
+      <div class="empty-state card">
+        <div class="empty-state-icon">📝</div>
+        <h3 class="empty-state-title">No Agreements Yet</h3>
+        <p class="empty-state-description">${errorMessage}</p>
+        <div class="flex gap-3 justify-center mt-4">
+          <a href="#/deal/new" class="btn-primary bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-emerald-700 transition btn-press">
+            Create Agreement
+          </a>
+          <a href="#/templates" class="px-4 py-2 rounded-lg font-semibold border border-navy-200 dark:border-navy-600 text-navy-700 dark:text-white hover:border-emerald-500 transition btn-press">
+            Browse Templates
+          </a>
+        </div>
       </div>
     `;
   }

@@ -99,6 +99,8 @@ export const createDeal = functions.https.onCall(async (data, context) => {
     creatorEmail: userEmail,
     participantUid: null,
     participantEmail: validated.participantEmail,
+    // Participants array for efficient querying (array-contains)
+    participants: [userId],
     type: validated.type,
     title: validated.title,
     description: validated.description,
@@ -190,6 +192,8 @@ export const acceptInvite = functions.https.onCall(async (data, context) => {
   await dealDoc.ref.update({
     participantUid: userId,
     participantEmail: userEmail,
+    // Add participant to the array for querying
+    participants: admin.firestore.FieldValue.arrayUnion(userId),
     status: 'awaiting_funding',
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });

@@ -97,12 +97,23 @@ async function loadListings() {
     renderListings(listings);
   } catch (error) {
     console.error('Error loading listings:', error);
-    showToast('Failed to load listings', 'error');
+    
+    // User-friendly error messages
+    let errorMessage = 'Please try refreshing the page.';
+    if (error.code === 'permission-denied') {
+      errorMessage = 'You need to be logged in to browse the marketplace.';
+    } else if (error.message?.includes('index')) {
+      errorMessage = 'Marketplace is being set up. Please try again in a moment.';
+    }
+    
     document.getElementById('listings-container').innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">😕</div>
-        <h3 class="empty-state-title">Couldn't load listings</h3>
-        <p class="empty-state-description">Please try refreshing the page</p>
+      <div class="empty-state card">
+        <div class="empty-state-icon">🛒</div>
+        <h3 class="empty-state-title">Couldn't Load Marketplace</h3>
+        <p class="empty-state-description">${errorMessage}</p>
+        <button onclick="window.location.reload()" class="btn-primary bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-emerald-700 transition btn-press mt-4">
+          Refresh Page
+        </button>
       </div>
     `;
   }

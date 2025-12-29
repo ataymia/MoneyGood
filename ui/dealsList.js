@@ -97,14 +97,54 @@ async function loadDeals(userId) {
       return;
     }
 
-    const dealsQuery = query(
-      collection(db, 'deals'),
-      where('participants', 'array-contains', userId),
-      orderBy('createdAt', 'desc')
-    );
+    const db = window.db;
     
-    const snapshot = await getDocs(dealsQuery);
-    const deals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Query using participants array (preferred) with fallback to creatorUid/participantUid
+    // This supports both old deals (without participants array) and new deals
+    let deals = [];
+    
+    try {
+      // First try: participants array-contains query (efficient)
+      const participantsQuery = query(
+        collection(db, 'deals'),
+        where('participants', 'array-contains', userId),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const snapshot = await getDocs(participantsQuery);
+      deals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (participantsError) {
+      console.warn('participants query failed, trying fallback:', participantsError.message);
+      
+      // Fallback: Query by creatorUid OR participantUid (for legacy deals)
+      const creatorQuery = query(
+        collection(db, 'deals'),
+        where('creatorUid', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const participantQuery = query(
+        collection(db, 'deals'),
+        where('participantUid', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const [creatorSnap, participantSnap] = await Promise.all([
+        getDocs(creatorQuery),
+        getDocs(participantQuery)
+      ]);
+      
+      const dealsMap = new Map();
+      creatorSnap.docs.forEach(doc => dealsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+      participantSnap.docs.forEach(doc => {
+        if (!dealsMap.has(doc.id)) {
+          dealsMap.set(doc.id, { id: doc.id, ...doc.data() });
+        }
+      });
+      
+      deals = Array.from(dealsMap.values());
+      deals.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    }
     
     // Store deals globally for filtering
     window.allDeals = deals;
@@ -113,9 +153,23 @@ async function loadDeals(userId) {
     renderDealsGrid(deals);
   } catch (error) {
     console.error('Error loading deals:', error);
+    
+    // Provide user-friendly error messages
+    let errorMessage = 'Unable to load your agreements.';
+    if (error.code === 'permission-denied') {
+      errorMessage = 'You don\'t have access to any agreements yet. Create one or ask for an invite link!';
+    } else if (error.message?.includes('index')) {
+      errorMessage = 'Database setup in progress. Please try again in a few moments.';
+    }
+    
     document.getElementById('deals-container').innerHTML = `
-      <div class="text-center py-12">
-        <p class="text-red-600 dark:text-red-400">Error loading deals: ${error.message}</p>
+      <div class="empty-state card">
+        <div class="empty-state-icon">📝</div>
+        <h3 class="empty-state-title">No Agreements Found</h3>
+        <p class="empty-state-description">${errorMessage}</p>
+        <a href="#/deal/new" class="btn-primary bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-emerald-700 transition btn-press mt-4">
+          Create Your First Agreement
+        </a>
       </div>
     `;
   }

@@ -2,7 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -11,109 +14,155 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == uid;
     }
     
+    // Check if user is a deal participant using creatorUid/participantUid fields
     function isDealParticipant(dealData) {
       return isAuthenticated() && 
         (request.auth.uid == dealData.creatorUid || 
          request.auth.uid == dealData.participantUid);
     }
     
+    // Check if user is in participants array (for query compatibility)
+    function isInParticipantsArray(dealData) {
+      return isAuthenticated() && 
+        dealData.participants != null &&
+        request.auth.uid in dealData.participants;
+    }
+    
+    // Combined participant check (supports both schema versions)
+    function canAccessDeal(dealData) {
+      return isDealParticipant(dealData) || isInParticipantsArray(dealData);
+    }
+    
     function isListingOwner(listingData) {
       return isAuthenticated() && request.auth.uid == listingData.creatorUid;
     }
     
-    // Users collection
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    
     match /users/{uid} {
+      // Users can only read/write their own document
       allow read: if isOwner(uid);
       allow create: if isOwner(uid);
-      // Only allow updating non-sensitive fields
       allow update: if isOwner(uid) && 
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['stripeConnectAccountId', 'createdAt']);
+      allow delete: if false;
     }
     
-    // User notifications
+    // User notifications - private to user
     match /users/{uid}/notifications/{notificationId} {
-      allow read: if isOwner(uid);
-      allow write: if isOwner(uid);
+      allow read, write: if isOwner(uid);
     }
     
-    // User connections (favorites, recent partners)
+    // User connections (favorites, recent partners) - private to user
     match /users/{uid}/connections/{connectionId} {
-      allow read: if isOwner(uid);
-      allow write: if isOwner(uid);
+      allow read, write: if isOwner(uid);
     }
     
-    // User activity feed
+    // User activity feed - private to user
     match /users/{uid}/activityFeed/{eventId} {
-      allow read: if isOwner(uid);
-      allow write: if isOwner(uid);
+      allow read, write: if isOwner(uid);
     }
     
-    // Deals collection
+    // ============================================
+    // DEALS/AGREEMENTS COLLECTION
+    // ============================================
+    
     match /deals/{dealId} {
-      allow read: if isDealParticipant(resource.data);
-      // Creation happens only through Cloud Functions
+      // READ: Allow if user is a participant (creator or participant)
+      // This supports queries like:
+      //   where('creatorUid', '==', uid)
+      //   where('participantUid', '==', uid)
+      //   where('participants', 'array-contains', uid)
+      allow read: if canAccessDeal(resource.data);
+      
+      // CREATE: Only through Cloud Functions (to enforce validation + setup fees)
       allow create: if false;
-      // Updates restricted to non-sensitive fields only
-      allow update: if isDealParticipant(resource.data) && 
+      
+      // UPDATE: Participants can update non-sensitive fields only
+      // Sensitive fields (status, payments, tokens) are managed by Cloud Functions
+      allow update: if canAccessDeal(resource.data) && 
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['status', 'inviteToken', 'setupFeeCents', 'fairnessHoldA', 'fairnessHoldB', 
-                   'extensionFeesTotalCents', 'stripeCheckoutSessionId', 'participantUid']);
+                   'extensionFeesTotalCents', 'stripeCheckoutSessionId', 'participantUid',
+                   'creatorUid', 'participants', 'createdAt']);
+      
+      // DELETE: Not allowed (deals should be cancelled via Cloud Functions)
       allow delete: if false;
       
-      // Deal actions subcollection (audit log)
+      // ------------------------------------------
+      // DEAL SUBCOLLECTIONS
+      // ------------------------------------------
+      
+      // Actions/Audit Log - read only for participants, write via Cloud Functions
       match /actions/{actionId} {
-        allow read: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data);
-        allow write: if false; // Only Cloud Functions can write
+        allow read: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow write: if false;
       }
       
-      // Deal payments subcollection
+      // Payments - read only for participants, write via Cloud Functions  
       match /payments/{paymentId} {
-        allow read: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data);
-        allow write: if false; // Only Cloud Functions can write
+        allow read: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow write: if false;
       }
       
-      // Deal dispute subcollection
+      // Disputes - read only for participants, write via Cloud Functions
       match /dispute/{disputeId} {
-        allow read: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data);
-        allow write: if false; // Only Cloud Functions can write
+        allow read: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow write: if false;
       }
       
-      // Deal messages subcollection (chat)
+      // Messages/Chat - participants can read and create messages
       match /messages/{messageId} {
-        allow read: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data);
-        // Allow participants to send messages
-        allow create: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data) &&
+        allow read: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow create: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data) &&
           request.resource.data.senderUid == request.auth.uid &&
           request.resource.data.keys().hasAll(['senderUid', 'senderEmail', 'text', 'createdAt']);
         allow update, delete: if false;
       }
       
-      // Deal events subcollection (activity tracking)
+      // Events/Activity - participants can read and create events
       match /events/{eventId} {
-        allow read: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data);
-        // Allow participants to log events
-        allow create: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data) &&
+        allow read: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        allow create: if canAccessDeal(get(/databases/$(database)/documents/deals/$(dealId)).data) &&
           request.resource.data.userId == request.auth.uid;
         allow update, delete: if false;
       }
     }
     
-    // Marketplace listings
+    // ============================================
+    // MARKETPLACE LISTINGS COLLECTION  
+    // ============================================
+    
     match /listings/{listingId} {
-      // Anyone authenticated can read open listings
-      allow read: if isAuthenticated() && (
-        resource.data.status == 'open' ||
-        isListingOwner(resource.data)
-      );
-      // Authenticated users can create listings
+      // READ: Any authenticated user can read any listing
+      // (Marketplace is auth-gated at the UI level)
+      // This is simpler and avoids query evaluation issues
+      allow read: if isAuthenticated();
+      
+      // CREATE: Authenticated users can create listings with required fields
       allow create: if isAuthenticated() &&
         request.resource.data.creatorUid == request.auth.uid &&
         request.resource.data.keys().hasAll(['title', 'description', 'type', 'creatorUid', 'status', 'createdAt']);
-      // Only owner can update their own listings
+      
+      // UPDATE: Only the creator can update (except protected fields)
       allow update: if isListingOwner(resource.data) &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['creatorUid', 'createdAt']);
-      // Only owner can delete their listings
+      
+      // DELETE: Only the creator can delete
       allow delete: if isListingOwner(resource.data);
+    }
+    
+    // ============================================
+    // TEMPLATES COLLECTION (if stored in Firestore)
+    // ============================================
+    
+    match /templates/{templateId} {
+      // Templates are read-only for all authenticated users
+      allow read: if isAuthenticated();
+      // Write only via admin/Cloud Functions
+      allow write: if false;
     }
   }
 }
