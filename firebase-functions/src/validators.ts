@@ -3,11 +3,22 @@ import { z } from 'zod';
 // Leg model for structured agreement sides
 const LegSchema = z.object({
   kind: z.enum(['MONEY', 'GOODS', 'SERVICE']),
-  description: z.string().min(1).max(1000).optional(), // Required for GOODS/SERVICE
+  description: z.string().max(1000).optional(), // Required for GOODS/SERVICE
   declaredValueCents: z.number().int().min(0).optional(), // Required for GOODS/SERVICE
   moneyAmountCents: z.number().int().min(0).optional(), // Required for MONEY
   dueDate: z.string().optional(), // Optional for SERVICE
-});
+}).refine((leg) => {
+  // Validate that MONEY legs have moneyAmountCents
+  if (leg.kind === 'MONEY') {
+    return leg.moneyAmountCents !== undefined && leg.moneyAmountCents >= 0;
+  }
+  // Validate that GOODS/SERVICE legs have description and declaredValueCents
+  if (leg.kind === 'GOODS' || leg.kind === 'SERVICE') {
+    return leg.description && leg.description.length > 0 && 
+           leg.declaredValueCents !== undefined && leg.declaredValueCents >= 0;
+  }
+  return true;
+}, { message: 'Invalid leg data for the specified kind' });
 
 export const CreateDealSchema = z.object({
   title: z.string().min(1).max(200),

@@ -12,7 +12,8 @@
       ".env.template",
       ".firebaserc",
       "firestore.rules",
-      "firestore.indexes.json"
+      "firestore.indexes.json",
+      "storage.rules"
     ],
     "rewrites": [
       {
@@ -28,5 +29,8 @@
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }

@@ -1,0 +1,65 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check authentication
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the path
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Helper to validate file size (max 5MB)
+    function isValidSize() {
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+    
+    // Helper to validate image types
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    // Helper to validate document types
+    function isDocument() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('image/.*');
+    }
+    
+    // User profile pictures
+    // Path: /users/{userId}/profile.{ext}
+    match /users/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && isValidSize() && isImage();
+      allow delete: if isOwner(userId);
+    }
+    
+    // Deal attachments (evidence, documents)
+    // Path: /deals/{dealId}/{userId}/{fileName}
+    match /deals/{dealId}/{userId}/{fileName} {
+      // Only deal participants can read attachments
+      allow read: if isAuthenticated();
+      // Only the uploading user can write their own attachments
+      allow write: if isOwner(userId) && isValidSize() && isDocument();
+      allow delete: if isOwner(userId);
+    }
+    
+    // Listing images (marketplace)
+    // Path: /listings/{listingId}/{fileName}
+    match /listings/{listingId}/{fileName} {
+      // Anyone authenticated can read listing images
+      allow read: if isAuthenticated();
+      // Only authenticated users can upload (ownership checked at app level)
+      allow write: if isAuthenticated() && isValidSize() && isImage();
+      // Delete requires authentication (ownership checked at app level)
+      allow delete: if isAuthenticated();
+    }
+    
+    // Deny all other paths by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

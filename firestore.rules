@@ -17,6 +17,10 @@ service cloud.firestore {
          request.auth.uid == dealData.participantUid);
     }
     
+    function isListingOwner(listingData) {
+      return isAuthenticated() && request.auth.uid == listingData.creatorUid;
+    }
+    
     // Users collection
     match /users/{uid} {
       allow read: if isOwner(uid);
@@ -28,6 +32,18 @@ service cloud.firestore {
     
     // User notifications
     match /users/{uid}/notifications/{notificationId} {
+      allow read: if isOwner(uid);
+      allow write: if isOwner(uid);
+    }
+    
+    // User connections (favorites, recent partners)
+    match /users/{uid}/connections/{connectionId} {
+      allow read: if isOwner(uid);
+      allow write: if isOwner(uid);
+    }
+    
+    // User activity feed
+    match /users/{uid}/activityFeed/{eventId} {
       allow read: if isOwner(uid);
       allow write: if isOwner(uid);
     }
@@ -61,6 +77,43 @@ service cloud.firestore {
         allow read: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data);
         allow write: if false; // Only Cloud Functions can write
       }
+      
+      // Deal messages subcollection (chat)
+      match /messages/{messageId} {
+        allow read: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        // Allow participants to send messages
+        allow create: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data) &&
+          request.resource.data.senderUid == request.auth.uid &&
+          request.resource.data.keys().hasAll(['senderUid', 'senderEmail', 'text', 'createdAt']);
+        allow update, delete: if false;
+      }
+      
+      // Deal events subcollection (activity tracking)
+      match /events/{eventId} {
+        allow read: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data);
+        // Allow participants to log events
+        allow create: if isDealParticipant(get(/databases/$(database)/documents/deals/$(dealId)).data) &&
+          request.resource.data.userId == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+    
+    // Marketplace listings
+    match /listings/{listingId} {
+      // Anyone authenticated can read open listings
+      allow read: if isAuthenticated() && (
+        resource.data.status == 'open' ||
+        isListingOwner(resource.data)
+      );
+      // Authenticated users can create listings
+      allow create: if isAuthenticated() &&
+        request.resource.data.creatorUid == request.auth.uid &&
+        request.resource.data.keys().hasAll(['title', 'description', 'type', 'creatorUid', 'status', 'createdAt']);
+      // Only owner can update their own listings
+      allow update: if isListingOwner(resource.data) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['creatorUid', 'createdAt']);
+      // Only owner can delete their listings
+      allow delete: if isListingOwner(resource.data);
     }
   }
 }

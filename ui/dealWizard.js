@@ -274,21 +274,27 @@ function renderStep3(container) {
     e.preventDefault();
     const formData = store.getFromSession('dealWizard') || {};
     
-    // Collect leg A data
-    formData.legA = {
-      kind: kinds.legAKind,
-      description: document.getElementById('descriptionA')?.value || '',
-      declaredValueCents: parseInt(document.getElementById('declaredValueA')?.value) || undefined,
-      moneyAmountCents: parseInt(document.getElementById('moneyAmountA')?.value) || undefined,
-    };
+    // Collect leg A data - only include relevant fields per kind
+    const legAKind = kinds.legAKind;
+    formData.legA = { kind: legAKind };
     
-    // Collect leg B data
-    formData.legB = {
-      kind: kinds.legBKind,
-      description: document.getElementById('descriptionB')?.value || '',
-      declaredValueCents: parseInt(document.getElementById('declaredValueB')?.value) || undefined,
-      moneyAmountCents: parseInt(document.getElementById('moneyAmountB')?.value) || undefined,
-    };
+    if (legAKind === 'MONEY') {
+      formData.legA.moneyAmountCents = parseInt(document.getElementById('moneyAmountA')?.value) || 0;
+    } else {
+      formData.legA.description = document.getElementById('descriptionA')?.value || '';
+      formData.legA.declaredValueCents = parseInt(document.getElementById('declaredValueA')?.value) || 0;
+    }
+    
+    // Collect leg B data - only include relevant fields per kind
+    const legBKind = kinds.legBKind;
+    formData.legB = { kind: legBKind };
+    
+    if (legBKind === 'MONEY') {
+      formData.legB.moneyAmountCents = parseInt(document.getElementById('moneyAmountB')?.value) || 0;
+    } else {
+      formData.legB.description = document.getElementById('descriptionB')?.value || '';
+      formData.legB.declaredValueCents = parseInt(document.getElementById('declaredValueB')?.value) || 0;
+    }
     
     // Validate language in descriptions (quiet check - neutral message)
     const validation = validateDealLanguage({
