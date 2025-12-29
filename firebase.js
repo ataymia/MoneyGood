@@ -26,9 +26,15 @@ import {
   httpsCallable 
 } from 'https://www.gstatic.com/firebasejs/12.7.0/firebase-functions.js';
 
-// Import Firebase configuration from separate file (gitignored)
-// Copy firebase-config.template.js to firebase-config.js and update with your credentials
-import { firebaseConfig } from './firebase-config.js';
+// Firebase configuration from environment variables (Vite)
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
 
 // Firebase initialization state (safe mode)
 let firebaseApp = null;
