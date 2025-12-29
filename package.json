@@ -3,14 +3,17 @@
   "version": "1.0.0",
   "description": "Secure two-party deals with collateral, payments, and dispute resolution",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "firebase emulators:start",
-    "dev:frontend": "python -m http.server 8000",
-    "build": "cd firebase-functions && npm run build",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "dev:emulators": "firebase emulators:start",
+    "build:functions": "cd firebase-functions && npm run build",
     "deploy": "npm run build && firebase deploy",
     "deploy:functions": "cd firebase-functions && npm run build && cd .. && firebase deploy --only functions",
     "deploy:hosting": "firebase deploy --only hosting",
-    "deploy:cloudflare": "echo 'Push to GitHub to trigger Cloudflare Pages deployment'",
+    "deploy:cloudflare": "npm run build && echo 'Push to GitHub to trigger Cloudflare Pages deployment'",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
     "logs": "firebase functions:log",
     "test:functions": "cd firebase-functions && npm test",
@@ -28,5 +31,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/ataymia/MoneyGood.git"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
   }
 }

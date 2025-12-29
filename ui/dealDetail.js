@@ -158,9 +158,6 @@ function renderDealContent(deal, actions, messages, userId) {
   window.currentMessages = messages;
   window.currentUserId = userId;
 }
-  window.currentDeal = deal;
-  window.currentUserId = userId;
-}
 
 function renderDealInfo(deal, isCreator) {
   const dealDate = deal.dealDate?.seconds 

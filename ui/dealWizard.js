@@ -130,22 +130,6 @@ function renderStep1(container) {
     renderStep(2);
   });
 }
-        </button>
-      </div>
-    </form>
-  `;
-  
-  document.getElementById('step-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const data = store.getFromSession('dealWizard') || {};
-    data.title = document.getElementById('title').value;
-    data.description = document.getElementById('description').value;
-    data.participantEmail = document.getElementById('participantEmail').value;
-    store.saveToSession('dealWizard', data);
-    currentStep = 2;
-    renderStep(2);
-  });
-}
 
 function renderStep2(container) {
   container.innerHTML = `
@@ -538,4 +522,6 @@ function formatLegSummary(leg) {
   }
   
   return '';
+}
+
 window.renderStep = renderStep;

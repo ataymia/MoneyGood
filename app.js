@@ -81,7 +81,6 @@ onAuthStateChanged(auth, async (user) => {
     // Trigger initial route
     router.handleRoute();
   });
-} else {
 
 // Register routes
 router.register('/', renderLanding, false);
