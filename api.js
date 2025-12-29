@@ -82,6 +82,12 @@ export async function refreshConnectStatus() {
   return result.data;
 }
 
+export async function adminBootstrap() {
+  const callable = httpsCallable(window.firebaseFunctions, 'adminBootstrap');
+  const result = await callable({});
+  return result.data;
+}
+
 // Error handling wrapper
 export async function callFunction(fn, ...args) {
   try {

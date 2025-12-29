@@ -163,6 +163,137 @@ router.register('/admin/audit', renderAdminAudit, true);
 router.register('/connect/return', renderConnectReturn, true);
 router.register('/connect/refresh', renderConnectRefresh, true);
 
+// Admin Bootstrap Route
+router.register('/admin-setup', renderAdminSetup, false); // accessible without auth
+
+// Admin Setup Page - for bootstrapping first admin
+async function renderAdminSetup() {
+  const { user } = store.getState();
+  const content = document.getElementById('content');
+  
+  content.innerHTML = `
+    <div class="min-h-screen bg-gradient-to-br from-purple-50 to-navy-50 dark:from-navy-900 dark:to-navy-800 flex items-center justify-center p-4">
+      <div class="max-w-md w-full bg-white dark:bg-navy-800 rounded-2xl shadow-2xl p-8">
+        <div class="text-center mb-6">
+          <div class="text-5xl mb-4">🔐</div>
+          <h1 class="text-2xl font-bold text-navy-900 dark:text-white">Admin Setup</h1>
+          <p class="text-navy-600 dark:text-navy-400 mt-2">
+            Bootstrap admin access for your account
+          </p>
+        </div>
+        
+        <div id="setup-status" class="mb-6">
+          ${user ? `
+            <div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
+              <p class="text-emerald-800 dark:text-emerald-200 text-sm">
+                <strong>Signed in as:</strong> ${user.email}
+              </p>
+            </div>
+          ` : `
+            <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+              <p class="text-amber-800 dark:text-amber-200 text-sm">
+                Please <a href="#/auth" class="underline font-semibold">sign in</a> first to set up admin access.
+              </p>
+            </div>
+          `}
+        </div>
+        
+        <div id="admin-check" class="mb-6 hidden">
+          <div class="flex items-center justify-center space-x-2">
+            <div class="spinner w-5 h-5"></div>
+            <span class="text-navy-600 dark:text-navy-400">Checking admin status...</span>
+          </div>
+        </div>
+        
+        <div id="already-admin" class="hidden mb-6">
+          <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 text-center">
+            <div class="text-3xl mb-2">✅</div>
+            <p class="text-purple-800 dark:text-purple-200 font-semibold">You're already an admin!</p>
+            <a href="#/admin" class="inline-block mt-3 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+              Go to Admin Portal
+            </a>
+          </div>
+        </div>
+        
+        <div id="bootstrap-form" class="${user ? '' : 'hidden'}">
+          <button 
+            onclick="bootstrapAdmin()"
+            id="bootstrap-btn"
+            class="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold disabled:opacity-50"
+          >
+            🚀 Make Me Admin
+          </button>
+          <p class="text-xs text-navy-500 dark:text-navy-400 mt-3 text-center">
+            This only works if no admins exist yet, or your email is pre-approved.
+          </p>
+        </div>
+        
+        <div id="bootstrap-result" class="hidden"></div>
+        
+        <div class="mt-8 pt-6 border-t border-navy-200 dark:border-navy-700 text-center">
+          <a href="#/" class="text-navy-500 hover:text-navy-700 dark:hover:text-navy-300 text-sm">
+            ← Back to Home
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Check if user is already admin
+  if (user && window.isAdminUser) {
+    document.getElementById('bootstrap-form').classList.add('hidden');
+    document.getElementById('already-admin').classList.remove('hidden');
+  }
+}
+
+// Global handler for admin bootstrap
+window.bootstrapAdmin = async () => {
+  const btn = document.getElementById('bootstrap-btn');
+  const result = document.getElementById('bootstrap-result');
+  
+  btn.textContent = 'Setting up...';
+  btn.disabled = true;
+  
+  try {
+    const { adminBootstrap } = await import('./api.js');
+    const response = await adminBootstrap();
+    
+    result.classList.remove('hidden');
+    result.innerHTML = `
+      <div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 text-center">
+        <div class="text-3xl mb-2">🎉</div>
+        <p class="text-emerald-800 dark:text-emerald-200 font-semibold">${response.message}</p>
+        <p class="text-emerald-700 dark:text-emerald-300 text-sm mt-2">
+          ${response.firstAdmin ? 'You are the first admin!' : ''}
+        </p>
+        <button 
+          onclick="location.reload()"
+          class="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+        >
+          Sign Out & Sign Back In
+        </button>
+      </div>
+    `;
+    document.getElementById('bootstrap-form').classList.add('hidden');
+    
+    // Sign out to refresh the token
+    const { signOut } = await import('./firebaseClient.js');
+    await signOut(window.firebaseAuth);
+    
+  } catch (error) {
+    console.error('Bootstrap error:', error);
+    result.classList.remove('hidden');
+    result.innerHTML = `
+      <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <p class="text-red-800 dark:text-red-200 font-semibold">Setup Failed</p>
+        <p class="text-red-700 dark:text-red-300 text-sm mt-1">${error.message || 'Unknown error'}</p>
+      </div>
+    `;
+    btn.textContent = '🚀 Try Again';
+    btn.disabled = false;
+  }
+};
+
 // Stripe Connect Return Page - shown after completing onboarding
 async function renderConnectReturn() {
   const { user } = store.getState();

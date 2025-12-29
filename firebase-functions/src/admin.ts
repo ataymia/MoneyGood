@@ -1041,8 +1041,9 @@ export const adminUpdateModerationConfig = functions.https.onCall(async (data, c
 // ============================================
 
 /**
- * Bootstrap first admin (protected by email allowlist)
- * This function can only be called by users whose email is in ADMIN_BOOTSTRAP_EMAILS env var
+ * Bootstrap first admin
+ * This function allows the FIRST admin to be created if no admins exist yet,
+ * OR if the user's email is in the ADMIN_BOOTSTRAP_EMAILS env var
  */
 export const adminBootstrap = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
@@ -1054,31 +1055,37 @@ export const adminBootstrap = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('failed-precondition', 'User must have an email');
   }
   
-  // Check allowlist from environment variable
-  const allowedEmails = (process.env.ADMIN_BOOTSTRAP_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
-  
-  if (allowedEmails.length === 0) {
-    throw new functions.https.HttpsError('failed-precondition', 'No bootstrap emails configured');
-  }
-  
-  if (!allowedEmails.includes(userEmail.toLowerCase())) {
-    throw new functions.https.HttpsError('permission-denied', 'Email not in allowlist');
-  }
-  
   // Check if user already has admin claim
   if (context.auth.token.admin) {
     return { success: true, message: 'Already an admin' };
+  }
+  
+  // Check if ANY admins exist
+  const existingAdmins = await getDb().collection('users')
+    .where('isAdmin', '==', true)
+    .limit(1)
+    .get();
+  
+  const noAdminsExist = existingAdmins.empty;
+  
+  // Check allowlist from environment variable
+  const allowedEmails = (process.env.ADMIN_BOOTSTRAP_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(e => e);
+  const emailInAllowlist = allowedEmails.includes(userEmail.toLowerCase());
+  
+  // Allow if: no admins exist OR email is in allowlist
+  if (!noAdminsExist && !emailInAllowlist) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin bootstrap not available. Contact an existing admin.');
   }
   
   // Set admin custom claim
   await getAuth().setCustomUserClaims(context.auth.uid, { admin: true });
   
   // Update user document
-  await getDb().collection('users').doc(context.auth.uid).update({
+  await getDb().collection('users').doc(context.auth.uid).set({
     isAdmin: true,
     adminGrantedAt: admin.firestore.FieldValue.serverTimestamp(),
-    adminGrantedBy: 'bootstrap',
-  });
+    adminGrantedBy: noAdminsExist ? 'first-admin-bootstrap' : 'email-allowlist-bootstrap',
+  }, { merge: true });
   
   // Write audit log
   await writeAuditLog(
@@ -1087,14 +1094,15 @@ export const adminBootstrap = functions.https.onCall(async (data, context) => {
     'ADMIN_BOOTSTRAP',
     'user',
     context.auth.uid,
-    'Admin access granted via bootstrap',
+    noAdminsExist ? 'First admin created via bootstrap' : 'Admin access granted via email allowlist',
     { isAdmin: false },
     { isAdmin: true }
   );
   
   return { 
     success: true, 
-    message: 'Admin access granted. Please sign out and sign back in for changes to take effect.',
+    message: 'Admin access granted! Please sign out and sign back in for changes to take effect.',
+    firstAdmin: noAdminsExist,
   };
 });
 
