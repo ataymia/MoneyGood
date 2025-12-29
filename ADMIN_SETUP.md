@@ -6,11 +6,12 @@ This document provides comprehensive instructions for setting up and managing th
 1. [Overview](#overview)
 2. [Security Architecture](#security-architecture)
 3. [Initial Setup](#initial-setup)
-4. [Admin Access Management](#admin-access-management)
-5. [Admin Modules](#admin-modules)
-6. [Audit Logging](#audit-logging)
-7. [Support Ticket Flow](#support-ticket-flow)
-8. [Troubleshooting](#troubleshooting)
+4. [Accessing the Admin Portal](#accessing-the-admin-portal)
+5. [Admin Access Management](#admin-access-management)
+6. [Admin Modules](#admin-modules)
+7. [Audit Logging](#audit-logging)
+8. [Support Ticket Flow](#support-ticket-flow)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -134,6 +135,53 @@ node scripts/bootstrap-admin.js --revoke admin@example.com
 1. Log out and log back in (to refresh token with new claims)
 2. Navigate to `/#/admin`
 3. Should see the Admin Dashboard
+
+---
+
+## Accessing the Admin Portal
+
+### Via Navigation Bar
+
+Once you have admin privileges, the **Admin** button appears in the navigation bar:
+
+1. Log in with your admin account
+2. Look for the purple **"Admin"** button in the top navigation bar (between Settings and Logout)
+3. Click to access the admin portal
+
+The Admin button only appears for users with the `admin: true` custom claim.
+
+### Via Direct URL
+
+You can also navigate directly to admin routes:
+
+| Route | Description |
+|-------|-------------|
+| `/#/admin` | Admin Dashboard (Overview) |
+| `/#/admin/overview` | Dashboard with KPIs |
+| `/#/admin/users` | User Management |
+| `/#/admin/agreements` | Agreement Oversight |
+| `/#/admin/marketplace` | Marketplace Moderation |
+| `/#/admin/payments` | Payments & Refunds |
+| `/#/admin/support` | Support Ticket Inbox |
+| `/#/admin/cases` | Investigation Cases |
+| `/#/admin/moderation` | Content Moderation Config |
+| `/#/admin/notifications` | Send Notifications |
+| `/#/admin/templates` | Email/Notification Templates |
+| `/#/admin/audit` | Audit Log Viewer |
+
+### Access Denied
+
+If you navigate to an admin route without admin privileges:
+- You will see an "Unauthorized" message
+- You will be prompted to log in with an admin account
+- Non-admin users cannot bypass this even by guessing URLs
+
+### Token Refresh Required
+
+After admin privileges are granted:
+1. The user must **log out and log back in**
+2. This refreshes the Firebase Auth token with the new `admin` claim
+3. The admin button will then appear in the navigation
 
 ---
 

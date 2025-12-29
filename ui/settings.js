@@ -93,6 +93,24 @@ function renderStripeSettings(user) {
           </div>
         </div>
         
+        <!-- Connect Status Details (hidden by default) -->
+        <div id="stripe-status-details" class="hidden p-3 rounded-lg border border-navy-200 dark:border-navy-600">
+          <div class="grid grid-cols-3 gap-2 text-center text-sm">
+            <div>
+              <span id="status-details" class="block text-lg">-</span>
+              <span class="text-navy-500">Details</span>
+            </div>
+            <div>
+              <span id="status-charges" class="block text-lg">-</span>
+              <span class="text-navy-500">Charges</span>
+            </div>
+            <div>
+              <span id="status-payouts" class="block text-lg">-</span>
+              <span class="text-navy-500">Payouts</span>
+            </div>
+          </div>
+        </div>
+        
         <button 
           id="stripe-connect-btn"
           onclick="handleStripeConnect()"
@@ -201,12 +219,32 @@ async function loadUserSettings(userId) {
       // Update Stripe status
       const statusEl = document.getElementById('stripe-connect-status');
       const btnEl = document.getElementById('stripe-connect-btn');
+      const detailsEl = document.getElementById('stripe-status-details');
       
       if (data.stripeConnectAccountId) {
-        statusEl.innerHTML = '<span class="text-sm text-emerald-600 font-semibold">✓ Connected</span>';
-        btnEl.textContent = 'Manage Payout Account';
+        const connectStatus = data.stripeConnectStatus || {};
+        
+        // Show status details
+        if (detailsEl) {
+          detailsEl.classList.remove('hidden');
+          document.getElementById('status-details').textContent = connectStatus.detailsSubmitted ? '✅' : '❌';
+          document.getElementById('status-charges').textContent = connectStatus.chargesEnabled ? '✅' : '❌';
+          document.getElementById('status-payouts').textContent = connectStatus.payoutsEnabled ? '✅' : '❌';
+        }
+        
+        if (connectStatus.payoutsEnabled && connectStatus.chargesEnabled) {
+          statusEl.innerHTML = '<span class="text-sm text-emerald-600 font-semibold">✓ Fully Connected</span>';
+          btnEl.textContent = 'Manage Payout Account';
+        } else if (connectStatus.detailsSubmitted) {
+          statusEl.innerHTML = '<span class="text-sm text-gold-600 font-semibold">⏳ Pending Verification</span>';
+          btnEl.textContent = 'Complete Setup';
+        } else {
+          statusEl.innerHTML = '<span class="text-sm text-gold-600 font-semibold">⚠️ Incomplete</span>';
+          btnEl.textContent = 'Finish Setup';
+        }
       } else {
         statusEl.innerHTML = '<span class="text-sm text-red-600 font-semibold">Not Connected</span>';
+        btnEl.textContent = 'Set Up Payouts';
       }
     }
   } catch (error) {

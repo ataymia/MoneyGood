@@ -607,6 +607,19 @@ export function httpsCallable(functions, name) {
       case 'setupStripeConnect':
         return { data: { url: 'https://connect.stripe.com/mock-setup' } };
         
+      case 'refreshConnectStatus':
+        return { 
+          data: { 
+            connected: true, 
+            status: {
+              detailsSubmitted: true,
+              chargesEnabled: true,
+              payoutsEnabled: true,
+            },
+            accountId: 'acct_mock123',
+          } 
+        };
+        
       default:
         return { data: { success: true } };
     }

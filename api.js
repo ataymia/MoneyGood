@@ -76,6 +76,12 @@ export async function setupStripeConnect() {
   return result.data;
 }
 
+export async function refreshConnectStatus() {
+  const callable = httpsCallable(window.firebaseFunctions, 'refreshConnectStatus');
+  const result = await callable({});
+  return result.data;
+}
+
 // Error handling wrapper
 export async function callFunction(fn, ...args) {
   try {

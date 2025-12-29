@@ -64,11 +64,21 @@ window.store = store;
 window.firebaseReady = firebaseReady;
 window.firebaseError = firebaseError;
 
+// Global admin status cache
+window.isAdminUser = false;
 
 // Initialize auth state
 onAuthStateChanged(auth, async (user) => {
     if (user) {
       store.setState({ user });
+      
+      // Check admin claim from token
+      try {
+        const tokenResult = await user.getIdTokenResult(true);
+        window.isAdminUser = tokenResult.claims.admin === true;
+      } catch (e) {
+        window.isAdminUser = false;
+      }
       
       // Create/update user document and check account status
       try {
@@ -148,6 +158,128 @@ router.register('/admin/moderation', renderAdminModeration, true);
 router.register('/admin/notifications', renderAdminNotifications, true);
 router.register('/admin/templates', renderAdminTemplates, true);
 router.register('/admin/audit', renderAdminAudit, true);
+
+// Stripe Connect Routes
+router.register('/connect/return', renderConnectReturn, true);
+router.register('/connect/refresh', renderConnectRefresh, true);
+
+// Stripe Connect Return Page - shown after completing onboarding
+async function renderConnectReturn() {
+  const { user } = store.getState();
+  const content = document.getElementById('content');
+  
+  content.innerHTML = `
+    ${Navbar({ user, isAdmin: window.isAdminUser })}
+    <div class="min-h-screen bg-gradient-to-br from-emerald-50 to-navy-50 dark:from-navy-900 dark:to-navy-800 flex items-center justify-center p-4">
+      <div class="max-w-md w-full bg-white dark:bg-navy-800 rounded-2xl shadow-2xl p-8 text-center">
+        <div class="text-6xl mb-4 animate-bounce-slow" id="connect-icon">⏳</div>
+        <h1 class="text-2xl font-bold text-navy-900 dark:text-white mb-4" id="connect-title">Verifying Connection...</h1>
+        <p class="text-navy-600 dark:text-navy-400 mb-6" id="connect-message">
+          Please wait while we verify your Stripe account status.
+        </p>
+        <div id="connect-actions" class="hidden space-y-3">
+          <a href="#/settings" class="block w-full px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold">
+            Go to Settings
+          </a>
+          <a href="#/app" class="block text-navy-500 hover:text-navy-700 text-sm">
+            Back to Dashboard
+          </a>
+        </div>
+        <div id="connect-loading" class="flex justify-center">
+          <div class="spinner w-8 h-8"></div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Refresh connect status from Stripe
+  try {
+    const { refreshConnectStatus } = await import('./api.js');
+    const result = await refreshConnectStatus();
+    
+    const icon = document.getElementById('connect-icon');
+    const title = document.getElementById('connect-title');
+    const message = document.getElementById('connect-message');
+    const actions = document.getElementById('connect-actions');
+    const loading = document.getElementById('connect-loading');
+    
+    loading.classList.add('hidden');
+    actions.classList.remove('hidden');
+    
+    if (result.status?.payoutsEnabled && result.status?.chargesEnabled) {
+      icon.textContent = '✅';
+      title.textContent = 'Successfully Connected!';
+      message.textContent = 'Your Stripe account is fully set up. You can now receive payouts.';
+    } else if (result.status?.detailsSubmitted) {
+      icon.textContent = '⏳';
+      title.textContent = 'Almost Done!';
+      message.textContent = 'Your details have been submitted. Stripe is reviewing your account. This usually takes a few minutes.';
+    } else {
+      icon.textContent = '⚠️';
+      title.textContent = 'Setup Incomplete';
+      message.innerHTML = `Your Stripe account setup is not complete. Please <a href="#/settings" class="text-emerald-600 underline">finish setup</a> to receive payouts.`;
+    }
+  } catch (error) {
+    console.error('Error refreshing connect status:', error);
+    document.getElementById('connect-icon').textContent = '❌';
+    document.getElementById('connect-title').textContent = 'Error Verifying';
+    document.getElementById('connect-message').textContent = error.message || 'Could not verify your Stripe connection. Please try again.';
+    document.getElementById('connect-loading').classList.add('hidden');
+    document.getElementById('connect-actions').classList.remove('hidden');
+  }
+}
+
+// Stripe Connect Refresh Page - shown when link expired or user left early
+async function renderConnectRefresh() {
+  const { user } = store.getState();
+  const content = document.getElementById('content');
+  
+  content.innerHTML = `
+    ${Navbar({ user, isAdmin: window.isAdminUser })}
+    <div class="min-h-screen bg-gradient-to-br from-gold-50 to-navy-50 dark:from-navy-900 dark:to-navy-800 flex items-center justify-center p-4">
+      <div class="max-w-md w-full bg-white dark:bg-navy-800 rounded-2xl shadow-2xl p-8 text-center">
+        <div class="text-6xl mb-4">🔄</div>
+        <h1 class="text-2xl font-bold text-navy-900 dark:text-white mb-4">Session Expired</h1>
+        <p class="text-navy-600 dark:text-navy-400 mb-6">
+          Your Stripe onboarding session has expired or was interrupted. 
+          No worries - click below to continue where you left off.
+        </p>
+        <button 
+          onclick="restartStripeConnect()"
+          id="restart-btn"
+          class="w-full px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold mb-4"
+        >
+          Continue Setup
+        </button>
+        <a href="#/settings" class="block text-navy-500 hover:text-navy-700 text-sm">
+          Back to Settings
+        </a>
+      </div>
+    </div>
+  `;
+}
+
+// Global handler for restarting Stripe Connect onboarding
+window.restartStripeConnect = async () => {
+  const btn = document.getElementById('restart-btn');
+  if (btn) {
+    btn.textContent = 'Redirecting...';
+    btn.disabled = true;
+  }
+  
+  try {
+    const { setupStripeConnect } = await import('./api.js');
+    const result = await setupStripeConnect();
+    window.location.href = result.url;
+  } catch (error) {
+    console.error('Error restarting Stripe Connect:', error);
+    showToast(error.message || 'Failed to restart setup. Please try again.', 'error');
+    if (btn) {
+      btn.textContent = 'Continue Setup';
+      btn.disabled = false;
+    }
+  }
+};
 
 // Account suspended page
 function renderAccountSuspended() {

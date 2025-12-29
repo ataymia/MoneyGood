@@ -1,7 +1,7 @@
 /**
  * Admin Firebase Functions
  * 
- * All functions require admin custom claim: request.auth.token.admin == true
+ * All functions require admin custom claim: request.getAuth().token.admin == true
  * All actions are logged to auditLogs collection
  */
 
@@ -10,8 +10,9 @@ import * as admin from 'firebase-admin';
 import { z } from 'zod';
 import { createRefund } from './stripe';
 
-const db = admin.firestore();
-const auth = admin.auth();
+// Lazy initialization - db and auth are accessed via getters
+const getDb = () => admin.firestore();
+const getAuth = () => admin.auth();
 
 // ============================================
 // VALIDATION SCHEMAS
@@ -135,7 +136,7 @@ async function writeAuditLog(
   afterSnapshot?: Record<string, any>,
   metadata?: Record<string, any>
 ): Promise<string> {
-  const logRef = await db.collection('auditLogs').add({
+  const logRef = await getDb().collection('auditLogs').add({
     adminUid,
     adminEmail,
     actionType,
@@ -161,7 +162,7 @@ async function createUserNotification(
   message: string,
   dealId?: string
 ): Promise<void> {
-  await db.collection('users').doc(userId).collection('notifications').add({
+  await getDb().collection('users').doc(userId).collection('notifications').add({
     type,
     title,
     message,
@@ -186,7 +187,7 @@ export const adminSetUserStatus = functions.https.onCall(async (data, context) =
   const adminEmail = context.auth!.token.email || '';
   
   // Get current user data
-  const userRef = db.collection('users').doc(validated.uid);
+  const userRef = getDb().collection('users').doc(validated.uid);
   const userDoc = await userRef.get();
   
   if (!userDoc.exists) {
@@ -206,7 +207,7 @@ export const adminSetUserStatus = functions.https.onCall(async (data, context) =
   
   // If suspended or deleted, revoke refresh tokens
   if (validated.status === 'suspended' || validated.status === 'deleted') {
-    await auth.revokeRefreshTokens(validated.uid);
+    await getAuth().revokeRefreshTokens(validated.uid);
   }
   
   // Write audit log
@@ -263,7 +264,7 @@ export const adminDeleteUser = functions.https.onCall(async (data, context) => {
   const adminEmail = context.auth!.token.email || '';
   
   // Get current user data
-  const userRef = db.collection('users').doc(validated.uid);
+  const userRef = getDb().collection('users').doc(validated.uid);
   const userDoc = await userRef.get();
   
   if (!userDoc.exists) {
@@ -277,7 +278,7 @@ export const adminDeleteUser = functions.https.onCall(async (data, context) => {
     // This is a dangerous operation and should be used sparingly
     
     // Delete from Firebase Auth
-    await auth.deleteUser(validated.uid);
+    await getAuth().deleteUser(validated.uid);
     
     // Soft-delete the Firestore doc (mark as deleted, don't actually delete)
     await userRef.update({
@@ -300,7 +301,7 @@ export const adminDeleteUser = functions.https.onCall(async (data, context) => {
     );
   } else {
     // Soft delete - disable login, mark as deleted
-    await auth.updateUser(validated.uid, { disabled: true });
+    await getAuth().updateUser(validated.uid, { disabled: true });
     
     await userRef.update({
       status: 'deleted',
@@ -339,13 +340,13 @@ export const adminAddUserNote = functions.https.onCall(async (data, context) => 
   const adminEmail = context.auth!.token.email || '';
   
   // Verify user exists
-  const userDoc = await db.collection('users').doc(validated.uid).get();
+  const userDoc = await getDb().collection('users').doc(validated.uid).get();
   if (!userDoc.exists) {
     throw new functions.https.HttpsError('not-found', 'User not found');
   }
   
   // Add note to subcollection
-  const noteRef = await db.collection('users').doc(validated.uid).collection('adminNotes').add({
+  const noteRef = await getDb().collection('users').doc(validated.uid).collection('adminNotes').add({
     note: validated.note,
     adminUid,
     adminEmail,
@@ -381,7 +382,7 @@ export const adminCancelDeal = functions.https.onCall(async (data, context) => {
   const adminUid = context.auth!.uid;
   const adminEmail = context.auth!.token.email || '';
   
-  const dealRef = db.collection('deals').doc(validated.dealId);
+  const dealRef = getDb().collection('deals').doc(validated.dealId);
   const dealDoc = await dealRef.get();
   
   if (!dealDoc.exists) {
@@ -476,13 +477,13 @@ export const adminAddDealNote = functions.https.onCall(async (data, context) => 
   const adminUid = context.auth!.uid;
   const adminEmail = context.auth!.token.email || '';
   
-  const dealDoc = await db.collection('deals').doc(validated.dealId).get();
+  const dealDoc = await getDb().collection('deals').doc(validated.dealId).get();
   if (!dealDoc.exists) {
     throw new functions.https.HttpsError('not-found', 'Deal not found');
   }
   
   // Add note to deal's actions subcollection
-  const noteRef = await db.collection('deals').doc(validated.dealId).collection('actions').add({
+  const noteRef = await getDb().collection('deals').doc(validated.dealId).collection('actions').add({
     type: 'ADMIN_NOTE',
     actorUid: adminUid,
     userEmail: adminEmail,
@@ -519,7 +520,7 @@ export const adminRemoveListing = functions.https.onCall(async (data, context) =
   const adminUid = context.auth!.uid;
   const adminEmail = context.auth!.token.email || '';
   
-  const listingRef = db.collection('listings').doc(validated.listingId);
+  const listingRef = getDb().collection('listings').doc(validated.listingId);
   const listingDoc = await listingRef.get();
   
   if (!listingDoc.exists) {
@@ -571,7 +572,7 @@ export const adminRestoreListing = functions.https.onCall(async (data, context) 
   const adminUid = context.auth!.uid;
   const adminEmail = context.auth!.token.email || '';
   
-  const listingRef = db.collection('listings').doc(validated.listingId);
+  const listingRef = getDb().collection('listings').doc(validated.listingId);
   const listingDoc = await listingRef.get();
   
   if (!listingDoc.exists) {
@@ -617,7 +618,7 @@ export const adminIssueRefund = functions.https.onCall(async (data, context) => 
   const adminEmail = context.auth!.token.email || '';
   
   // Get payment record
-  const paymentRef = db.collection('payments').doc(validated.paymentId);
+  const paymentRef = getDb().collection('payments').doc(validated.paymentId);
   const paymentDoc = await paymentRef.get();
   
   if (!paymentDoc.exists) {
@@ -701,7 +702,7 @@ export const adminReplyToTicket = functions.https.onCall(async (data, context) =
   const adminUid = context.auth!.uid;
   const adminEmail = context.auth!.token.email || '';
   
-  const ticketRef = db.collection('supportTickets').doc(validated.ticketId);
+  const ticketRef = getDb().collection('supportTickets').doc(validated.ticketId);
   const ticketDoc = await ticketRef.get();
   
   if (!ticketDoc.exists) {
@@ -770,7 +771,7 @@ export const adminCreateCase = functions.https.onCall(async (data, context) => {
   const adminUid = context.auth!.uid;
   const adminEmail = context.auth!.token.email || '';
   
-  const caseRef = await db.collection('cases').add({
+  const caseRef = await getDb().collection('cases').add({
     title: validated.title,
     description: validated.description,
     priority: validated.priority,
@@ -820,7 +821,7 @@ export const adminAddCaseNote = functions.https.onCall(async (data, context) => 
   const adminUid = context.auth!.uid;
   const adminEmail = context.auth!.token.email || '';
   
-  const caseRef = db.collection('cases').doc(validated.caseId);
+  const caseRef = getDb().collection('cases').doc(validated.caseId);
   const caseDoc = await caseRef.get();
   
   if (!caseDoc.exists) {
@@ -873,7 +874,7 @@ export const adminUpdateCaseStatus = functions.https.onCall(async (data, context
   const adminUid = context.auth!.uid;
   const adminEmail = context.auth!.token.email || '';
   
-  const caseRef = db.collection('cases').doc(validated.caseId);
+  const caseRef = getDb().collection('cases').doc(validated.caseId);
   const caseDoc = await caseRef.get();
   
   if (!caseDoc.exists) {
@@ -933,7 +934,7 @@ export const adminSendNotification = functions.https.onCall(async (data, context
     targetUids.push(validated.targetId);
   } else if (validated.targetType === 'deal' && validated.targetId) {
     // Notify deal participants
-    const dealDoc = await db.collection('deals').doc(validated.targetId).get();
+    const dealDoc = await getDb().collection('deals').doc(validated.targetId).get();
     if (!dealDoc.exists) {
       throw new functions.https.HttpsError('not-found', 'Deal not found');
     }
@@ -942,7 +943,7 @@ export const adminSendNotification = functions.https.onCall(async (data, context
     if (deal.participantUid) targetUids.push(deal.participantUid);
   } else if (validated.targetType === 'broadcast') {
     // Get all active users
-    const usersSnapshot = await db.collection('users')
+    const usersSnapshot = await getDb().collection('users')
       .where('status', 'in', ['active', null])
       .limit(1000) // Safety limit
       .get();
@@ -950,9 +951,9 @@ export const adminSendNotification = functions.https.onCall(async (data, context
   }
   
   // Create notifications
-  const batch = db.batch();
+  const batch = getDb().batch();
   for (const uid of targetUids) {
-    const notifRef = db.collection('users').doc(uid).collection('notifications').doc();
+    const notifRef = getDb().collection('users').doc(uid).collection('notifications').doc();
     batch.set(notifRef, {
       type: validated.type,
       title: validated.title,
@@ -993,7 +994,7 @@ export const adminUpdateModerationConfig = functions.https.onCall(async (data, c
   const adminUid = context.auth!.uid;
   const adminEmail = context.auth!.token.email || '';
   
-  const configRef = db.collection('moderationConfig').doc('main');
+  const configRef = getDb().collection('moderationConfig').doc('main');
   const configDoc = await configRef.get();
   
   const beforeData = configDoc.exists ? configDoc.data() : {};
@@ -1070,10 +1071,10 @@ export const adminBootstrap = functions.https.onCall(async (data, context) => {
   }
   
   // Set admin custom claim
-  await auth.setCustomUserClaims(context.auth.uid, { admin: true });
+  await getAuth().setCustomUserClaims(context.auth.uid, { admin: true });
   
   // Update user document
-  await db.collection('users').doc(context.auth.uid).update({
+  await getDb().collection('users').doc(context.auth.uid).update({
     isAdmin: true,
     adminGrantedAt: admin.firestore.FieldValue.serverTimestamp(),
     adminGrantedBy: 'bootstrap',
@@ -1118,7 +1119,7 @@ export const adminGrantAccess = functions.https.onCall(async (data, context) => 
   // Find target user
   let targetUid = uid;
   if (!targetUid && email) {
-    const userRecord = await auth.getUserByEmail(email);
+    const userRecord = await getAuth().getUserByEmail(email);
     targetUid = userRecord.uid;
   }
   
@@ -1127,10 +1128,10 @@ export const adminGrantAccess = functions.https.onCall(async (data, context) => 
   }
   
   // Set admin claim
-  await auth.setCustomUserClaims(targetUid, { admin: true });
+  await getAuth().setCustomUserClaims(targetUid, { admin: true });
   
   // Update user document
-  await db.collection('users').doc(targetUid).update({
+  await getDb().collection('users').doc(targetUid).update({
     isAdmin: true,
     adminGrantedAt: admin.firestore.FieldValue.serverTimestamp(),
     adminGrantedBy: adminUid,
@@ -1169,10 +1170,10 @@ export const adminRevokeAccess = functions.https.onCall(async (data, context) =>
   }
   
   // Remove admin claim
-  await auth.setCustomUserClaims(uid, { admin: false });
+  await getAuth().setCustomUserClaims(uid, { admin: false });
   
   // Update user document
-  await db.collection('users').doc(uid).update({
+  await getDb().collection('users').doc(uid).update({
     isAdmin: false,
     adminRevokedAt: admin.firestore.FieldValue.serverTimestamp(),
     adminRevokedBy: adminUid,
@@ -1217,13 +1218,13 @@ export const adminGetStats = functions.https.onCall(async (data, context) => {
     ticketsSnapshot,
     paymentsSnapshot,
   ] = await Promise.all([
-    db.collection('users').count().get(),
-    db.collection('users').where('createdAt', '>=', sevenDaysAgo).count().get(),
-    db.collection('users').where('createdAt', '>=', thirtyDaysAgo).count().get(),
-    db.collection('deals').get(),
-    db.collection('listings').get(),
-    db.collection('supportTickets').where('status', '==', 'open').count().get(),
-    db.collection('payments').where('createdAt', '>=', thirtyDaysAgo).get(),
+    getDb().collection('users').count().get(),
+    getDb().collection('users').where('createdAt', '>=', sevenDaysAgo).count().get(),
+    getDb().collection('users').where('createdAt', '>=', thirtyDaysAgo).count().get(),
+    getDb().collection('deals').get(),
+    getDb().collection('listings').get(),
+    getDb().collection('supportTickets').where('status', '==', 'open').count().get(),
+    getDb().collection('payments').where('createdAt', '>=', thirtyDaysAgo).get(),
   ]);
   
   // Process deals by status

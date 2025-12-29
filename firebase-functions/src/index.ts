@@ -957,12 +957,18 @@ export const setupStripeConnect = functions.https.onCall(async (data, context) =
 
     await db.collection('users').doc(userId).update({
       stripeConnectAccountId: stripeAccountId,
+      stripeConnectStatus: {
+        detailsSubmitted: false,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   }
 
-  const refreshUrl = `${process.env.APP_URL || 'http://localhost:5000'}/#/settings`;
-  const returnUrl = `${process.env.APP_URL || 'http://localhost:5000'}/#/settings?stripe=complete`;
+  const refreshUrl = `${process.env.APP_URL || 'http://localhost:5000'}/#/connect/refresh`;
+  const returnUrl = `${process.env.APP_URL || 'http://localhost:5000'}/#/connect/return`;
 
   const accountLink = await createAccountLink(stripeAccountId, refreshUrl, returnUrl);
 
@@ -970,9 +976,57 @@ export const setupStripeConnect = functions.https.onCall(async (data, context) =
 });
 
 /**
+ * Refresh Stripe Connect account status
+ * Called after onboarding to update status from Stripe
+ */
+export const refreshConnectStatus = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+  const userDoc = await db.collection('users').doc(userId).get();
+  const stripeAccountId = userDoc.data()?.stripeConnectAccountId;
+
+  if (!stripeAccountId) {
+    return { 
+      connected: false, 
+      status: null 
+    };
+  }
+
+  try {
+    // Get Stripe instance via internal helper
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || functions.config().stripe?.secret_key);
+    const account = await stripe.accounts.retrieve(stripeAccountId);
+
+    const status = {
+      detailsSubmitted: account.details_submitted || false,
+      chargesEnabled: account.charges_enabled || false,
+      payoutsEnabled: account.payouts_enabled || false,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.collection('users').doc(userId).update({
+      stripeConnectStatus: status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { 
+      connected: true, 
+      status,
+      accountId: stripeAccountId,
+    };
+  } catch (error: any) {
+    console.error('Error refreshing connect status:', error);
+    throw new functions.https.HttpsError('internal', error.message || 'Failed to refresh status');
+  }
+});
+
+/**
  * Stripe webhook handler (v1 function using runtime config)
  * Handles payment events: checkout.session.completed, payment_intent.payment_failed,
- * charge.refunded, charge.dispute.created
+ * charge.refunded, charge.dispute.created, account.updated
  * 
  * NOTE: Uses functions.config() instead of Secret Manager to avoid billing requirements.
  * TODO: Migrate to Secret Manager after billing is enabled (before March 2026 deprecation).
@@ -1012,6 +1066,10 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
 
         case 'charge.dispute.created':
           await handleDisputeCreated(event.data.object);
+          break;
+
+        case 'account.updated':
+          await handleConnectAccountUpdated(event.data.object);
           break;
 
         default:
@@ -1144,6 +1202,43 @@ async function handleCheckoutCompleted(session: any) {
 
   // Check if deal should transition to active status
   await checkAndActivateDeal(dealId);
+}
+
+/**
+ * Handle Stripe Connect account updates
+ */
+async function handleConnectAccountUpdated(account: any) {
+  console.log(`Connect account updated: ${account.id}`);
+
+  // Find user with this connect account ID
+  const usersSnapshot = await db.collection('users')
+    .where('stripeConnectAccountId', '==', account.id)
+    .limit(1)
+    .get();
+
+  if (usersSnapshot.empty) {
+    console.log('No user found for connect account:', account.id);
+    return;
+  }
+
+  const userDoc = usersSnapshot.docs[0];
+
+  // Update connect status fields
+  await userDoc.ref.update({
+    stripeConnectStatus: {
+      detailsSubmitted: account.details_submitted || false,
+      chargesEnabled: account.charges_enabled || false,
+      payoutsEnabled: account.payouts_enabled || false,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  console.log(`Updated connect status for user ${userDoc.id}:`, {
+    detailsSubmitted: account.details_submitted,
+    chargesEnabled: account.charges_enabled,
+    payoutsEnabled: account.payouts_enabled,
+  });
 }
 
 /**
