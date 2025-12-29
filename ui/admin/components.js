@@ -250,24 +250,9 @@ export function AdminConfirmModal({
   `;
 }
 
-// Modal helpers
-window.showAdminModal = (modalId, data = {}) => {
-  const modal = document.getElementById(modalId);
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    window.currentModalData = data;
-  }
-};
-
-window.closeAdminModal = (modalId) => {
-  const modal = document.getElementById(modalId);
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-    window.currentModalData = null;
-  }
-};
+// Modal helpers - attached to window for onclick handlers
+window.showAdminModal = (modalId, data = {}) => showAdminModal(modalId, data);
+window.closeAdminModal = (modalId) => closeAdminModal(modalId);
 
 // ============================================
 // DETAIL DRAWER
@@ -297,30 +282,10 @@ export function DetailDrawer({ id = 'detail-drawer', title = 'Details', content 
   `;
 }
 
-window.openDrawer = (drawerId) => {
-  const drawer = document.getElementById(drawerId);
-  const overlay = document.getElementById(`${drawerId}-overlay`);
-  if (drawer) {
-    drawer.classList.remove('translate-x-full');
-    overlay?.classList.remove('hidden');
-  }
-};
-
-window.closeDrawer = (drawerId) => {
-  const drawer = document.getElementById(drawerId);
-  const overlay = document.getElementById(`${drawerId}-overlay`);
-  if (drawer) {
-    drawer.classList.add('translate-x-full');
-    overlay?.classList.add('hidden');
-  }
-};
-
-window.updateDrawerContent = (drawerId, content) => {
-  const contentEl = document.getElementById(`${drawerId}-content`);
-  if (contentEl) {
-    contentEl.innerHTML = content;
-  }
-};
+// Drawer helpers - attached to window for onclick handlers
+window.openDrawer = (drawerId) => openDrawer(drawerId);
+window.closeDrawer = (drawerId) => closeDrawer(drawerId);
+window.updateDrawerContent = (drawerId, content) => updateDrawerContent(drawerId, content);
 
 // ============================================
 // ACTION BUTTONS
@@ -499,4 +464,51 @@ export function AdminTabs({ tabs, activeTab, onTabChange = 'handleTabChange' }) 
       ${tabsHtml}
     </div>
   `;
+}
+
+// ============================================
+// EXPORTED HELPER FUNCTIONS
+// ============================================
+
+export function showAdminModal(modalId, data = {}) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    window.currentModalData = data;
+  }
+}
+
+export function closeAdminModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    window.currentModalData = null;
+  }
+}
+
+export function openDrawer(drawerId) {
+  const drawer = document.getElementById(drawerId);
+  const overlay = document.getElementById(`${drawerId}-overlay`);
+  if (drawer) {
+    drawer.classList.remove('translate-x-full');
+    overlay?.classList.remove('hidden');
+  }
+}
+
+export function closeDrawer(drawerId) {
+  const drawer = document.getElementById(drawerId);
+  const overlay = document.getElementById(`${drawerId}-overlay`);
+  if (drawer) {
+    drawer.classList.add('translate-x-full');
+    overlay?.classList.add('hidden');
+  }
+}
+
+export function updateDrawerContent(drawerId, content) {
+  const contentEl = document.getElementById(`${drawerId}-content`);
+  if (contentEl) {
+    contentEl.innerHTML = content;
+  }
 }
