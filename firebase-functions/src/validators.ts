@@ -1,24 +1,35 @@
 import { z } from 'zod';
+import { MIN_AMOUNT_CENTS, MAX_AMOUNT_CENTS, MIN_DECLARED_VALUE_CENTS } from './feeConfig';
+
+// Minimum amount is $5.00 (500 cents)
+const MIN_PRINCIPAL_CENTS = MIN_AMOUNT_CENTS; // 500
 
 // Leg model for structured agreement sides
 const LegSchema = z.object({
   kind: z.enum(['MONEY', 'GOODS', 'SERVICE']),
   description: z.string().max(1000).optional(), // Required for GOODS/SERVICE
-  declaredValueCents: z.number().int().min(0).optional(), // Required for GOODS/SERVICE
-  moneyAmountCents: z.number().int().min(0).optional(), // Required for MONEY
+  // Primary: cents-based fields (supports decimal inputs converted to cents)
+  principalCents: z.number().int().min(MIN_PRINCIPAL_CENTS).max(MAX_AMOUNT_CENTS).optional(),
+  declaredValueCents: z.number().int().min(MIN_DECLARED_VALUE_CENTS).max(MAX_AMOUNT_CENTS).optional(),
+  // Legacy/display fields
+  amountUsd: z.number().min(0).optional(), // Can have decimals now
+  declaredValueUsd: z.number().min(0).optional(),
+  moneyAmountCents: z.number().int().min(0).optional(), // Legacy alias for principalCents
   dueDate: z.string().optional(), // Optional for SERVICE
 }).refine((leg) => {
-  // Validate that MONEY legs have moneyAmountCents
+  // Validate that MONEY legs have principalCents or moneyAmountCents
   if (leg.kind === 'MONEY') {
-    return leg.moneyAmountCents !== undefined && leg.moneyAmountCents >= 0;
+    const cents = leg.principalCents || leg.moneyAmountCents;
+    return cents !== undefined && cents >= MIN_PRINCIPAL_CENTS;
   }
   // Validate that GOODS/SERVICE legs have description and declaredValueCents
   if (leg.kind === 'GOODS' || leg.kind === 'SERVICE') {
-    return leg.description && leg.description.length > 0 && 
-           leg.declaredValueCents !== undefined && leg.declaredValueCents >= 0;
+    const hasDescription = leg.description && leg.description.length > 0;
+    const hasValue = leg.declaredValueCents !== undefined && leg.declaredValueCents >= MIN_DECLARED_VALUE_CENTS;
+    return hasDescription && hasValue;
   }
   return true;
-}, { message: 'Invalid leg data for the specified kind' });
+}, { message: 'Invalid leg data for the specified kind. Money legs require minimum $5.00.' });
 
 export const CreateDealSchema = z.object({
   title: z.string().min(1).max(200),
@@ -31,8 +42,11 @@ export const CreateDealSchema = z.object({
   ]),
   dealDate: z.string(),
   timezone: z.string(),
+  // Primary: cents-based (supports decimal amounts)
+  principalCents: z.number().int().min(MIN_PRINCIPAL_CENTS).max(MAX_AMOUNT_CENTS).optional(),
   // Legacy fields (kept for backward compatibility)
   moneyAmountCents: z.number().int().min(0).optional(),
+  amountUsd: z.number().min(0).optional(), // Can have decimals now
   goodsA: z.string().optional(),
   goodsB: z.string().optional(),
   declaredValueA: z.number().int().min(0).optional(),
@@ -73,6 +87,11 @@ export const FreezeDealSchema = z.object({
 
 export const UnfreezeDealSchema = z.object({
   dealId: z.string().min(1),
+});
+
+export const CancelDealSchema = z.object({
+  dealId: z.string().min(1),
+  reason: z.string().max(500).optional(),
 });
 
 export const RequestExtensionSchema = z.object({

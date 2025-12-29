@@ -369,21 +369,42 @@ async function renderJoinDeal(params) {
   } catch (error) {
     console.error('Error joining agreement:', error);
     
+    // Determine error reason
+    let reason = 'invalid_token';
+    let message = 'This invite link is invalid or has already been used.';
+    
+    if (error.message?.includes('expired')) {
+      reason = 'expired';
+      message = 'This invite link has expired. Please ask the sender for a new invitation.';
+    } else if (error.message?.includes('already')) {
+      message = 'This invitation has already been accepted.';
+    } else if (error.message?.includes('own')) {
+      message = 'You cannot join your own agreement.';
+    }
+    
     document.getElementById('join-preview').innerHTML = `
       <div class="p-6 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 text-center">
-        <div class="text-4xl mb-3">❌</div>
-        <p class="font-bold text-red-900 dark:text-red-300 mb-2">Failed to Join</p>
-        <p class="text-sm text-red-800 dark:text-red-400 mb-4">${error.message || 'Invalid or expired invitation'}</p>
-        <button 
-          onclick="window.location.hash = '/app'" 
-          class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-        >
-          Go to Dashboard
-        </button>
+        <div class="text-4xl mb-3">🔗</div>
+        <p class="font-bold text-red-900 dark:text-red-300 mb-2">Unable to Join Agreement</p>
+        <p class="text-sm text-red-800 dark:text-red-400 mb-4">${message}</p>
+        <div class="space-y-2">
+          <button 
+            onclick="window.location.hash = '/dashboard'" 
+            class="block w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+          >
+            Go to Dashboard
+          </button>
+          <button 
+            onclick="window.location.hash = '/deal/new'" 
+            class="block w-full px-4 py-2 border border-navy-300 dark:border-navy-600 text-navy-700 dark:text-navy-300 rounded-lg hover:bg-navy-50 dark:hover:bg-navy-800"
+          >
+            Create New Agreement
+          </button>
+        </div>
       </div>
     `;
     
-    showToast(error.message || 'Failed to join agreement', 'error');
+    showToast(message, 'error');
   }
 }
 

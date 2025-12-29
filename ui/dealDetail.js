@@ -15,11 +15,14 @@ import {
   proposeOutcome, 
   confirmOutcome, 
   freezeDeal, 
-  requestExtension 
+  requestExtension,
+  cancelDeal 
 } from '../api.js';
 import { store } from '../store.js';
 import { containsBlockedLanguage, getBlockedLanguageMessage } from '../blocked-language.js';
 import { isStripeReady, showStripeConfigError } from '../stripeClient.js';
+import { renderAgreementUnavailable, renderUnavailableCard } from './agreementUnavailable.js';
+import { formatCurrency as formatCurrencyFromCents } from '../feeConfig.js';
 
 export async function renderDealDetail(params) {
   const { id: dealId } = params;
@@ -49,12 +52,28 @@ async function loadDeal(dealId, userId) {
     const dealDoc = await getDoc(doc(window.db, 'deals', dealId));
     
     if (!dealDoc.exists()) {
-      showToast('Agreement not found', 'error');
-      window.location.hash = '/app';
+      // Show unavailable page for not found
+      renderAgreementUnavailable({ reason: 'not_found' });
       return;
     }
     
     const deal = { id: dealDoc.id, ...dealDoc.data() };
+    
+    // Check if deal is cancelled
+    if (deal.status === 'cancelled') {
+      renderAgreementUnavailable({ 
+        reason: 'cancelled',
+        message: `This agreement was cancelled${deal.cancelledAt ? ' on ' + formatDate(deal.cancelledAt) : ''}.`
+      });
+      return;
+    }
+    
+    // Check if user has access (is participant)
+    const isParticipant = deal.creatorUid === userId || deal.participantUid === userId;
+    if (!isParticipant && deal.status !== 'invited') {
+      renderAgreementUnavailable({ reason: 'no_access' });
+      return;
+    }
     
     // Load actions (audit log)
     const actionsRef = collection(window.db, 'deals', dealId, 'actions');
@@ -73,7 +92,17 @@ async function loadDeal(dealId, userId) {
     renderDealContent(deal, actions, messages, userId);
   } catch (error) {
     console.error('Error loading agreement:', error);
-    showToast('Failed to load agreement', 'error');
+    
+    // Check for permission denied
+    if (error.code === 'permission-denied') {
+      renderAgreementUnavailable({ reason: 'no_access' });
+      return;
+    }
+    
+    renderAgreementUnavailable({ 
+      reason: 'error',
+      message: 'We couldn\'t load this agreement. Please try again later.'
+    });
   }
 }
 
@@ -308,6 +337,19 @@ function renderDealActions(deal, isCreator, userId) {
         class="w-full px-4 py-2 bg-gold-600 text-white rounded-lg font-semibold hover:bg-gold-700 transition mt-3"
       >
         Request Extension
+      </button>
+    `;
+  }
+  
+  // Cancel button for creator on pre-lock statuses
+  if (isCreator && (deal.status === 'invited' || deal.status === 'awaiting_funding')) {
+    const hasPaid = deal.setupFeeCents > 0 || deal.creatorPaymentStatus === 'succeeded';
+    actions += `
+      <button 
+        onclick="handleCancelDeal('${deal.id}', ${hasPaid})"
+        class="w-full px-4 py-2 mt-3 border-2 border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 rounded-lg font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+      >
+        Cancel Agreement
       </button>
     `;
   }
@@ -657,4 +699,51 @@ window.handleRequestExtension = async (dealId) => {
   } catch (error) {
     showToast(error.message || 'Failed to request extension', 'error');
   }
+};
+
+window.handleCancelDeal = async (dealId, hasPaid) => {
+  // Build confirmation message based on payment status
+  let message = `<div class="text-left space-y-3">
+    <p>Are you sure you want to cancel this agreement?</p>`;
+  
+  if (hasPaid) {
+    message += `
+    <div class="bg-gold-50 dark:bg-gold-900/20 border border-gold-400 rounded-lg p-3 text-sm">
+      <strong class="text-gold-800 dark:text-gold-300">Refund Policy:</strong>
+      <ul class="mt-2 ml-4 list-disc text-gold-700 dark:text-gold-400">
+        <li>Your <strong>principal amount</strong> will be refunded</li>
+        <li>The <strong>startup fee is non-refundable</strong> (covers processing costs)</li>
+      </ul>
+    </div>`;
+  } else {
+    message += `
+    <p class="text-sm text-navy-600 dark:text-navy-400">
+      No payments have been made yet. This agreement will be cancelled with no charges.
+    </p>`;
+  }
+  
+  message += `</div>`;
+  
+  // Show confirmation modal
+  showModal({
+    title: 'Cancel Agreement',
+    message,
+    confirmText: 'Yes, Cancel',
+    cancelText: 'Keep Agreement',
+    confirmClass: 'bg-red-600 hover:bg-red-700',
+    onConfirm: async () => {
+      try {
+        showToast('Cancelling agreement...', 'info');
+        await cancelDeal(dealId);
+        showToast('Agreement cancelled successfully', 'success');
+        
+        // Redirect to dashboard after short delay
+        setTimeout(() => {
+          window.location.hash = '#/dashboard';
+        }, 1500);
+      } catch (error) {
+        showToast(error.message || 'Failed to cancel agreement', 'error');
+      }
+    }
+  });
 };

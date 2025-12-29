@@ -3,6 +3,15 @@ import { createDeal } from '../api.js';
 import { router } from '../router.js';
 import { store } from '../store.js';
 import { validateDealLanguage, getBlockedLanguageMessage } from '../blocked-language.js';
+import { 
+  calculateFees,
+  parseAndValidateAmount, 
+  formatCurrency,
+  renderFeeBreakdown,
+  MIN_AMOUNT_USD,
+  MAX_AMOUNT_USD,
+  MIN_AMOUNT_CENTS,
+} from '../feeConfig.js';
 
 let currentStep = 1;
 const totalSteps = 4;
@@ -279,10 +288,26 @@ function renderStep3(container) {
     formData.legA = { kind: legAKind };
     
     if (legAKind === 'MONEY') {
-      formData.legA.moneyAmountCents = parseInt(document.getElementById('moneyAmountA')?.value) || 0;
+      const amountInput = document.getElementById('moneyAmountA')?.value;
+      const parsed = parseAndValidateAmount(amountInput);
+      if (!parsed.valid) {
+        showToast(parsed.error, 'error');
+        return;
+      }
+      // Store cents as the source of truth
+      formData.legA.principalCents = parsed.cents;
+      formData.legA.moneyAmountCents = parsed.cents; // Backward compat
+      formData.legA.amountUsd = parsed.amountUsd; // For display
     } else {
       formData.legA.description = document.getElementById('descriptionA')?.value || '';
-      formData.legA.declaredValueCents = parseInt(document.getElementById('declaredValueA')?.value) || 0;
+      const valueInput = document.getElementById('declaredValueA')?.value;
+      const parsed = parseAndValidateAmount(valueInput);
+      if (!parsed.valid) {
+        showToast(parsed.error, 'error');
+        return;
+      }
+      formData.legA.declaredValueCents = parsed.cents;
+      formData.legA.declaredValueUsd = parsed.amountUsd;
     }
     
     // Collect leg B data - only include relevant fields per kind
@@ -290,10 +315,25 @@ function renderStep3(container) {
     formData.legB = { kind: legBKind };
     
     if (legBKind === 'MONEY') {
-      formData.legB.moneyAmountCents = parseInt(document.getElementById('moneyAmountB')?.value) || 0;
+      const amountInput = document.getElementById('moneyAmountB')?.value;
+      const parsed = parseAndValidateAmount(amountInput);
+      if (!parsed.valid) {
+        showToast(parsed.error, 'error');
+        return;
+      }
+      formData.legB.principalCents = parsed.cents;
+      formData.legB.moneyAmountCents = parsed.cents;
+      formData.legB.amountUsd = parsed.amountUsd;
     } else {
       formData.legB.description = document.getElementById('descriptionB')?.value || '';
-      formData.legB.declaredValueCents = parseInt(document.getElementById('declaredValueB')?.value) || 0;
+      const valueInput = document.getElementById('declaredValueB')?.value;
+      const parsed = parseAndValidateAmount(valueInput);
+      if (!parsed.valid) {
+        showToast(parsed.error, 'error');
+        return;
+      }
+      formData.legB.declaredValueCents = parsed.cents;
+      formData.legB.declaredValueUsd = parsed.amountUsd;
     }
     
     // Validate language in descriptions (quiet check - neutral message)
@@ -310,7 +350,8 @@ function renderStep3(container) {
     
     // Set legacy fields for backward compatibility
     if (formData.legA.kind === 'MONEY') {
-      formData.moneyAmountCents = formData.legA.moneyAmountCents;
+      formData.moneyAmountCents = formData.legA.principalCents;
+      formData.principalCents = formData.legA.principalCents;
     }
     if (formData.legA.kind !== 'MONEY') {
       formData.goodsA = formData.legA.description;
@@ -331,18 +372,40 @@ function renderLegFields(side, kind, existingData = {}) {
   const id = side;
   
   if (kind === 'MONEY') {
-    return Input({ 
-      id: `moneyAmount${id}`, 
-      type: 'number',
-      label: 'Amount (cents)', 
-      placeholder: '10000 (= $100.00)',
-      min: 0,
-      required: true,
-      value: existingData.moneyAmountCents || ''
-    });
+    // Get existing value - could be in cents or as float USD
+    const existingValue = existingData.principalCents 
+      ? (existingData.principalCents / 100).toFixed(2)
+      : (existingData.amountUsd ? existingData.amountUsd.toFixed(2) : '');
+    
+    return `
+      <div class="relative">
+        <label for="moneyAmount${id}" class="block text-sm font-medium text-navy-700 dark:text-navy-200 mb-1">
+          Amount <span class="text-red-500">*</span>
+        </label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-navy-500 font-semibold">$</span>
+          <input 
+            type="text" 
+            inputmode="decimal"
+            id="moneyAmount${id}" 
+            class="w-full pl-8 pr-4 py-2 border border-navy-300 dark:border-navy-600 rounded-lg bg-white dark:bg-navy-700 text-navy-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            placeholder="150.00"
+            required
+            value="${existingValue}"
+          />
+        </div>
+        <p class="text-xs text-navy-500 dark:text-navy-400 mt-1">
+          Minimum: $${MIN_AMOUNT_USD.toFixed(2)}
+        </p>
+      </div>
+    `;
   }
   
   if (kind === 'GOODS') {
+    const existingValue = existingData.declaredValueCents 
+      ? (existingData.declaredValueCents / 100).toFixed(2)
+      : (existingData.declaredValueUsd ? existingData.declaredValueUsd.toFixed(2) : '');
+    
     return `
       ${Textarea({ 
         id: `description${id}`, 
@@ -352,19 +415,34 @@ function renderLegFields(side, kind, existingData = {}) {
         required: true,
         value: existingData.description || ''
       })}
-      ${Input({ 
-        id: `declaredValue${id}`, 
-        type: 'number',
-        label: 'Declared Value (cents)', 
-        placeholder: '10000 (= $100.00)',
-        min: 0,
-        required: true,
-        value: existingData.declaredValueCents || ''
-      })}
+      <div class="relative">
+        <label for="declaredValue${id}" class="block text-sm font-medium text-navy-700 dark:text-navy-200 mb-1">
+          Declared Value <span class="text-red-500">*</span>
+        </label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-navy-500 font-semibold">$</span>
+          <input 
+            type="text" 
+            inputmode="decimal"
+            id="declaredValue${id}" 
+            class="w-full pl-8 pr-4 py-2 border border-navy-300 dark:border-navy-600 rounded-lg bg-white dark:bg-navy-700 text-navy-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            placeholder="150.00"
+            required
+            value="${existingValue}"
+          />
+        </div>
+        <p class="text-xs text-navy-500 dark:text-navy-400 mt-1">
+          Enter the fair market value. Minimum: $${MIN_AMOUNT_USD.toFixed(2)}
+        </p>
+      </div>
     `;
   }
   
   if (kind === 'SERVICE') {
+    const existingValue = existingData.declaredValueCents 
+      ? (existingData.declaredValueCents / 100).toFixed(2)
+      : (existingData.declaredValueUsd ? existingData.declaredValueUsd.toFixed(2) : '');
+    
     return `
       ${Textarea({ 
         id: `description${id}`, 
@@ -374,15 +452,26 @@ function renderLegFields(side, kind, existingData = {}) {
         required: true,
         value: existingData.description || ''
       })}
-      ${Input({ 
-        id: `declaredValue${id}`, 
-        type: 'number',
-        label: 'Declared Value (cents)', 
-        placeholder: '10000 (= $100.00)',
-        min: 0,
-        required: true,
-        value: existingData.declaredValueCents || ''
-      })}
+      <div class="relative">
+        <label for="declaredValue${id}" class="block text-sm font-medium text-navy-700 dark:text-navy-200 mb-1">
+          Declared Value <span class="text-red-500">*</span>
+        </label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-navy-500 font-semibold">$</span>
+          <input 
+            type="text" 
+            inputmode="decimal"
+            id="declaredValue${id}" 
+            class="w-full pl-8 pr-4 py-2 border border-navy-300 dark:border-navy-600 rounded-lg bg-white dark:bg-navy-700 text-navy-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            placeholder="150.00"
+            required
+            value="${existingValue}"
+          />
+        </div>
+        <p class="text-xs text-navy-500 dark:text-navy-400 mt-1">
+          Enter the fair market value. Minimum: $${MIN_AMOUNT_USD.toFixed(2)}
+        </p>
+      </div>
     `;
   }
   
@@ -391,6 +480,11 @@ function renderLegFields(side, kind, existingData = {}) {
 
 function renderStep4(container) {
   const data = store.getFromSession('dealWizard') || {};
+  
+  // Calculate fees if either side involves money (use cents)
+  const moneyLeg = data.legA?.kind === 'MONEY' ? data.legA : (data.legB?.kind === 'MONEY' ? data.legB : null);
+  const principalCents = moneyLeg?.principalCents || (moneyLeg?.moneyAmountCents) || 0;
+  const feeBreakdownHtml = principalCents > 0 ? renderFeeBreakdown(principalCents) : '';
   
   container.innerHTML = `
     <h2 class="text-2xl font-bold text-navy-900 dark:text-white mb-6">Step 4: Date & Review</h2>
@@ -438,6 +532,8 @@ function renderStep4(container) {
           ` : ''}
         </div>
       </div>
+      
+      ${feeBreakdownHtml}
       
       <div class="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
         <p class="text-sm text-emerald-800 dark:text-emerald-300">
@@ -516,15 +612,19 @@ function formatLegSummary(leg) {
   if (!leg) return '';
   
   if (leg.kind === 'MONEY') {
-    return `$${((leg.moneyAmountCents || 0) / 100).toFixed(2)} payment`;
+    // Use principalCents as source of truth, fall back to other fields
+    const cents = leg.principalCents || leg.moneyAmountCents || 0;
+    return `${formatCurrency(cents)} payment`;
   }
   
   if (leg.kind === 'GOODS') {
-    return `${leg.description || 'Goods'} (value: $${((leg.declaredValueCents || 0) / 100).toFixed(2)})`;
+    const cents = leg.declaredValueCents || 0;
+    return `${leg.description || 'Goods'} (value: ${formatCurrency(cents)})`;
   }
   
   if (leg.kind === 'SERVICE') {
-    return `${leg.description || 'Service'} (value: $${((leg.declaredValueCents || 0) / 100).toFixed(2)})`;
+    const cents = leg.declaredValueCents || 0;
+    return `${leg.description || 'Service'} (value: ${formatCurrency(cents)})`;
   }
   
   return '';

@@ -8,6 +8,7 @@ import {
   ConfirmOutcomeSchema,
   FreezeDealSchema,
   UnfreezeDealSchema,
+  CancelDealSchema,
   RequestExtensionSchema,
   ApproveExtensionSchema,
 } from './validators';
@@ -16,14 +17,18 @@ import {
   createConnectAccount,
   createAccountLink,
   constructWebhookEvent,
+  createRefund,
 } from './stripe';
 import {
-  calculateSetupFee,
-  calculateFairnessHold,
   isDealPastDue,
   calculateExtensionFee,
   getExtensionDays,
 } from './dealMachine';
+import {
+  calculateFees,
+  calculateFairnessHold,
+  MONEYGOOD_STARTUP_FEE_CENTS,
+} from './feeConfig';
 // Notifications available in './notifications' module if needed
 
 admin.initializeApp();
@@ -84,12 +89,33 @@ export const createDeal = functions.https.onCall(async (data, context) => {
   const userId = context.auth.uid;
   const userEmail = context.auth.token.email || '';
 
-  const setupFeeCents = calculateSetupFee(validated.type);
-  const { fairnessHoldA, fairnessHoldB } = calculateFairnessHold(
-    validated.type,
-    validated.declaredValueA,
-    validated.declaredValueB
-  );
+  // Extract principal in cents - support multiple input formats
+  // Priority: principalCents > leg.principalCents > moneyAmountCents > amountUsd*100
+  let principalCents = validated.principalCents || 0;
+  if (!principalCents && validated.legA?.kind === 'MONEY') {
+    principalCents = validated.legA.principalCents || validated.legA.moneyAmountCents || 0;
+  }
+  if (!principalCents && validated.legB?.kind === 'MONEY') {
+    principalCents = validated.legB.principalCents || validated.legB.moneyAmountCents || 0;
+  }
+  if (!principalCents && validated.moneyAmountCents) {
+    principalCents = validated.moneyAmountCents;
+  }
+  if (!principalCents && validated.amountUsd) {
+    principalCents = Math.round(validated.amountUsd * 100);
+  }
+  
+  // Calculate fees with gross-up using new fee calculator
+  const feeBreakdown = principalCents > 0 
+    ? calculateFees(principalCents)
+    : null;
+  
+  // Calculate fairness holds from leg declared values
+  const declaredValueCentsA = validated.legA?.declaredValueCents || validated.declaredValueA || 0;
+  const declaredValueCentsB = validated.legB?.declaredValueCents || validated.declaredValueB || 0;
+  
+  const fairnessHoldA = calculateFairnessHold(declaredValueCentsA);
+  const fairnessHoldB = calculateFairnessHold(declaredValueCentsB);
 
   const inviteToken = generateToken();
   const dealDate = new Date(validated.dealDate);
@@ -107,11 +133,21 @@ export const createDeal = functions.https.onCall(async (data, context) => {
     dealDate: admin.firestore.Timestamp.fromDate(dealDate),
     timezone: validated.timezone,
     status: 'invited',
-    moneyAmountCents: validated.moneyAmountCents || null,
+    // Amount fields - principalCents is source of truth
+    principalCents: principalCents || null,
+    moneyAmountCents: principalCents || null, // Legacy alias
+    // Fee breakdown (user sees only startupFeeCents, not internal breakdown)
+    feeBreakdown: feeBreakdown ? {
+      principalCents: feeBreakdown.principalCents,
+      startupFeeCents: feeBreakdown.startupFeeCents, // All-in fee shown to user
+      totalChargeCents: feeBreakdown.totalChargeCents,
+      // Internal accounting (not exposed to user)
+      _internal: feeBreakdown._internal,
+    } : null,
     goodsA: validated.goodsA || null,
     goodsB: validated.goodsB || null,
-    declaredValueA: validated.declaredValueA || null,
-    declaredValueB: validated.declaredValueB || null,
+    declaredValueA: declaredValueCentsA || null,
+    declaredValueB: declaredValueCentsB || null,
     // Store with both old and new field names for backward compatibility
     fairnessHoldA,
     fairnessHoldB,
@@ -120,7 +156,8 @@ export const createDeal = functions.https.onCall(async (data, context) => {
     // Add legs model fields if provided
     legA: validated.legA || null,
     legB: validated.legB || null,
-    setupFeeCents,
+    // Setup fee - now derived from feeBreakdown.startupFeeCents
+    setupFeeCents: feeBreakdown?.startupFeeCents || MONEYGOOD_STARTUP_FEE_CENTS,
     extensionFeesTotalCents: 0,
     inviteToken,
     inviteExpiresAt: admin.firestore.Timestamp.fromDate(
@@ -140,13 +177,18 @@ export const createDeal = functions.https.onCall(async (data, context) => {
     userEmail,
     'DEAL_CREATED',
     `Deal "${validated.title}" created`,
-    { type: validated.type }
+    { type: validated.type, principalCents }
   );
 
   return {
     dealId: dealRef.id,
     inviteToken,
-    setupFeeCents,
+    // Return user-friendly fee info (single startup fee)
+    feeBreakdown: feeBreakdown ? {
+      principalCents: feeBreakdown.principalCents,
+      startupFeeCents: feeBreakdown.startupFeeCents,
+      totalChargeCents: feeBreakdown.totalChargeCents,
+    } : null,
     fairnessHoldA,
     fairnessHoldB,
   };
@@ -609,6 +651,146 @@ export const unfreezeDeal = functions.https.onCall(async (data, context) => {
   );
 
   return { success: true, newStatus };
+});
+
+/**
+ * Cancel a deal before it's locked (both parties funded)
+ * 
+ * REFUND POLICY:
+ * - Principal is fully refunded to payer(s)
+ * - Startup fee is NON-REFUNDABLE (covers platform + processing costs)
+ */
+export const cancelDeal = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const validated = CancelDealSchema.parse(data);
+  const userId = context.auth.uid;
+  const userEmail = context.auth.token.email || '';
+
+  const dealDoc = await db.collection('deals').doc(validated.dealId).get();
+
+  if (!dealDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Deal not found');
+  }
+
+  const deal = dealDoc.data()!;
+
+  // Only participants can cancel
+  if (deal.creatorUid !== userId && deal.participantUid !== userId) {
+    throw new functions.https.HttpsError('permission-denied', 'Not a participant in this deal');
+  }
+
+  // Cannot cancel locked deals (both parties have funded)
+  const lockedStatuses = ['active', 'past_due', 'settled', 'completed', 'frozen'];
+  if (lockedStatuses.includes(deal.status)) {
+    throw new functions.https.HttpsError(
+      'failed-precondition', 
+      'Cannot cancel this agreement. Both parties have already funded it.'
+    );
+  }
+
+  // Cannot cancel already cancelled deals
+  if (deal.status === 'cancelled') {
+    throw new functions.https.HttpsError('already-exists', 'Deal is already cancelled');
+  }
+
+  // Process refunds for any payments made (principal only)
+  const paymentsSnapshot = await db.collection('deals').doc(validated.dealId)
+    .collection('payments')
+    .where('status', '==', 'completed')
+    .get();
+
+  const refundResults: Array<{party: string, refundedCents: number, success: boolean, error?: string}> = [];
+
+  for (const paymentDoc of paymentsSnapshot.docs) {
+    const payment = paymentDoc.data();
+    
+    // Only refund principal/contribution payments, not the startup fee portion
+    if (payment.purpose === 'CONTRIBUTION' || payment.purpose === 'SETUP_FEE') {
+      try {
+        // Calculate refundable amount (principal only)
+        // For CONTRIBUTION payments, we stored principalCents
+        // For SETUP_FEE payments, the whole amount was fee so nothing to refund
+        const principalCents = payment.principalCents || 
+          (payment.purpose === 'CONTRIBUTION' ? (deal.principalCents || deal.moneyAmountCents || 0) : 0);
+        
+        if (principalCents > 0 && payment.stripePaymentIntentId) {
+          // Issue partial refund for principal only
+          await createRefund(payment.stripePaymentIntentId, principalCents);
+          
+          // Update payment record
+          await paymentDoc.ref.update({
+            refundedCents: principalCents,
+            refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+            status: 'refunded',
+            refundNote: 'Principal refunded on cancellation. Startup fee retained.',
+          });
+
+          refundResults.push({
+            party: payment.party,
+            refundedCents: principalCents,
+            success: true,
+          });
+        } else if (payment.purpose === 'SETUP_FEE') {
+          // Startup fee is non-refundable - mark as retained
+          await paymentDoc.ref.update({
+            refundNote: 'Startup fee is non-refundable',
+          });
+          refundResults.push({
+            party: payment.party,
+            refundedCents: 0,
+            success: true,
+          });
+        }
+      } catch (error: any) {
+        console.error('Refund error for payment:', paymentDoc.id, error);
+        refundResults.push({
+          party: payment.party,
+          refundedCents: 0,
+          success: false,
+          error: error.message || 'Refund failed',
+        });
+      }
+    }
+  }
+
+  // Update deal status to cancelled
+  await dealDoc.ref.update({
+    status: 'cancelled',
+    cancelledBy: userId,
+    cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+    cancelReason: validated.reason || 'Cancelled by participant',
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await logAction(
+    validated.dealId,
+    userId,
+    userEmail,
+    'DEAL_CANCELLED',
+    `Deal cancelled: ${validated.reason || 'No reason provided'}`,
+    { refundResults }
+  );
+
+  // Notify other party if they exist
+  const otherPartyId = deal.creatorUid === userId ? deal.participantUid : deal.creatorUid;
+  if (otherPartyId) {
+    await createNotification(
+      otherPartyId,
+      'deal-cancelled',
+      'Agreement Cancelled',
+      `${userEmail} has cancelled the agreement "${deal.title}". Any principal amount you paid has been refunded.`,
+      validated.dealId
+    );
+  }
+
+  return { 
+    success: true, 
+    refundResults,
+    message: 'Agreement cancelled. Principal amounts will be refunded. Startup fees are non-refundable.',
+  };
 });
 
 /**

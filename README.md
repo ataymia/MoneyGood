@@ -33,6 +33,19 @@ This guide walks you through configuring Firebase, Stripe, and deploying the com
 - **Webhook Handlers**: Automated payment status updates
 - **Multiple Payment Types**: Setup fees, contributions, fairness holds, extension fees
 
+### 💵 Fees & Amounts
+- **Minimum Agreement**: $5.00 minimum principal amount
+- **Decimal Support**: Enter amounts with cents (e.g., $150.72)
+- **Single Startup Fee**: One all-inclusive fee covering platform + processing
+- **Transparent Pricing**: User sees: Agreement Amount + Startup Fee = Total
+- **Refund Policy**: Principal fully refundable on cancellation; startup fee is non-refundable
+
+### 🔄 Cancellation & Refunds
+- **Cancel Before Lock**: Agreements can be cancelled before both parties fund
+- **Principal Refund**: Full agreement amount refunded on cancellation
+- **Non-Refundable Fee**: Startup fee covers platform + processing, not refunded
+- **Clear Messaging**: Users informed of refund policy at checkout
+
 ### 🏪 Marketplace
 - **Public Listings**: Browse available deals in a public marketplace
 - **Category Filters**: Filter by Payments, Services, Goods, Accountability

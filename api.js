@@ -52,6 +52,12 @@ export async function unfreezeDeal(dealId) {
   return result.data;
 }
 
+export async function cancelDeal(dealId, reason = '') {
+  const callable = httpsCallable(window.firebaseFunctions, 'cancelDeal');
+  const result = await callable({ dealId, reason });
+  return result.data;
+}
+
 export async function requestExtension(dealId, extensionType) {
   const callable = httpsCallable(window.firebaseFunctions, 'requestExtension');
   const result = await callable({ dealId, extensionType });
