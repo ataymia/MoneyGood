@@ -129,9 +129,17 @@ export function validateDealLanguage(data) {
 
 /**
  * Get user-friendly error message for blocked language
+ * NOTE: This message intentionally does NOT mention betting/wagering
  */
 export function getBlockedLanguageMessage() {
-  return 'This platform supports conditional agreements and commitments. Please remove wagering/betting language and terms suggesting opposing positions or paired outcomes.';
+  return 'Please reword this agreement to focus on commitments between parties.';
+}
+
+/**
+ * Get a warning message for risky content
+ */
+export function getRiskyContentWarning() {
+  return 'Consider rephrasing to make the terms clearer for both parties.';
 }
 
 /**

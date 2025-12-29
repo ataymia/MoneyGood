@@ -2,8 +2,18 @@
 import { collection, query, where, orderBy, getDocs, onSnapshot } from '../firebaseClient.js';
 import { Navbar, Card, formatCurrency, formatDate, showToast, Spinner } from './components.js';
 import { renderSidebar, renderMobileNav } from './navigation.js';
+import { getUserActivityFeed, renderActivityFeed } from './events.js';
 import { router } from '../router.js';
 import { store } from '../store.js';
+
+// Quick Actions configuration
+const QUICK_ACTIONS = [
+  { icon: '➕', label: 'New Agreement', href: '#/deal/new' },
+  { icon: '📋', label: 'Templates', href: '#/templates' },
+  { icon: '🛒', label: 'Marketplace', href: '#/marketplace' },
+  { icon: '👥', label: 'People', href: '#/people' },
+  { icon: '🔔', label: 'Notifications', href: '#/notifications' },
+];
 
 export async function renderDashboard() {
   const { user } = store.getState();
@@ -15,22 +25,52 @@ export async function renderDashboard() {
       <div class="flex-1 overflow-y-auto">
         ${Navbar({ user })}
         <div class="container mx-auto px-4 py-8">
-          <div class="flex items-center justify-between mb-8">
-            <div>
-              <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Dashboard</h1>
-              <p class="text-navy-600 dark:text-navy-400">Manage your deals and transactions</p>
-            </div>
-            <button 
-              onclick="window.location.hash = '/deal/new'" 
-              class="btn-primary bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition shadow-glow"
-            >
-              + New Deal
-            </button>
+          <!-- Welcome Header -->
+          <div class="mb-8">
+            <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">
+              Welcome back${user.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}!
+            </h1>
+            <p class="text-navy-600 dark:text-navy-400">Here's what's happening with your agreements</p>
           </div>
           
-          <div id="deals-container" class="space-y-8">
-            <div class="flex items-center justify-center py-12">
-              ${Spinner({ size: 'lg' })}
+          <!-- Quick Actions -->
+          <div class="mb-8">
+            <h2 class="text-lg font-semibold text-navy-900 dark:text-white mb-4">Quick Actions</h2>
+            <div class="flex gap-3 overflow-x-auto pb-2">
+              ${QUICK_ACTIONS.map(action => `
+                <a href="${action.href}" class="quick-action hover-lift btn-press flex-shrink-0">
+                  <span class="quick-action-icon">${action.icon}</span>
+                  <span class="quick-action-label">${action.label}</span>
+                </a>
+              `).join('')}
+            </div>
+          </div>
+          
+          <!-- Main Content Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Deals Section (2 cols) -->
+            <div class="lg:col-span-2">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-navy-900 dark:text-white">Your Agreements</h2>
+                <a href="#/deals" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View all →</a>
+              </div>
+              <div id="deals-container" class="space-y-4">
+                <div class="flex items-center justify-center py-12">
+                  ${Spinner({ size: 'lg' })}
+                </div>
+              </div>
+            </div>
+            
+            <!-- Activity Feed (1 col) -->
+            <div class="lg:col-span-1">
+              <div class="card p-6">
+                <h2 class="text-lg font-semibold text-navy-900 dark:text-white mb-4">Activity Feed</h2>
+                <div id="activity-feed">
+                  <div class="flex items-center justify-center py-8">
+                    ${Spinner({ size: 'md' })}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -39,7 +79,31 @@ export async function renderDashboard() {
     </div>
   `;
 
-  loadDeals(user.uid);
+  // Load data in parallel
+  Promise.all([
+    loadDeals(user.uid),
+    loadActivityFeed(user.uid)
+  ]);
+}
+
+async function loadActivityFeed(userId) {
+  try {
+    const activities = await getUserActivityFeed(userId, 10);
+    const container = document.getElementById('activity-feed');
+    if (container) {
+      container.innerHTML = renderActivityFeed(activities, 8);
+    }
+  } catch (error) {
+    console.error('Error loading activity feed:', error);
+    const container = document.getElementById('activity-feed');
+    if (container) {
+      container.innerHTML = `
+        <div class="text-center py-8 text-navy-500">
+          <p class="text-sm">No recent activity</p>
+        </div>
+      `;
+    }
+  }
 }
 
 async function loadDeals(userId) {
@@ -117,27 +181,49 @@ function renderDealsGrouped(deals, userId) {
   
   if (deals.length === 0) {
     container.innerHTML = `
-      <div class="text-center py-12">
-        <div class="text-6xl mb-4">💰</div>
-        <h2 class="text-2xl font-bold text-navy-900 dark:text-white mb-2">No deals yet</h2>
-        <p class="text-navy-600 dark:text-navy-400 mb-6">Create your first deal to get started</p>
-        <button 
-          onclick="window.location.hash = '/deal/new'" 
-          class="btn-primary bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition"
-        >
-          Create Deal
-        </button>
+      <div class="empty-state card">
+        <div class="empty-state-icon">📝</div>
+        <h3 class="empty-state-title">No agreements yet</h3>
+        <p class="empty-state-description">Create your first agreement or explore the marketplace</p>
+        <div class="flex gap-3 justify-center">
+          <a href="#/deal/new" class="btn-primary bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-emerald-700 transition btn-press">
+            Create Agreement
+          </a>
+          <a href="#/templates" class="px-4 py-2 rounded-lg font-semibold border border-navy-200 dark:border-navy-600 text-navy-700 dark:text-white hover:border-emerald-500 transition btn-press">
+            Browse Templates
+          </a>
+        </div>
       </div>
     `;
     return;
   }
   
+  // Show max 6 deals on dashboard
+  const allDeals = [
+    ...groups.needsAction,
+    ...groups.active,
+    ...groups.pastDue,
+    ...groups.frozen
+  ].slice(0, 6);
+  
   container.innerHTML = `
-    ${renderDealSection('Needs Action', groups.needsAction, userId, 'red')}
-    ${renderDealSection('Active Deals', groups.active, userId, 'emerald')}
-    ${renderDealSection('Past Due', groups.pastDue, userId, 'orange')}
-    ${renderDealSection('Frozen', groups.frozen, userId, 'purple')}
-    ${renderDealSection('Completed', groups.completed, userId, 'gray')}
+    ${groups.needsAction.length > 0 ? `
+      <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <p class="text-sm text-red-700 dark:text-red-300 font-medium">
+          ⚠️ ${groups.needsAction.length} agreement${groups.needsAction.length > 1 ? 's need' : ' needs'} your attention
+        </p>
+      </div>
+    ` : ''}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      ${allDeals.map(deal => renderDealCard(deal, userId)).join('')}
+    </div>
+    ${deals.length > 6 ? `
+      <div class="text-center mt-4">
+        <a href="#/deals" class="text-emerald-600 hover:text-emerald-700 font-medium text-sm">
+          View all ${deals.length} agreements →
+        </a>
+      </div>
+    ` : ''}
   `;
 }
 

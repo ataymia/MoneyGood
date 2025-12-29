@@ -93,9 +93,9 @@ function renderStep1(container) {
         value: store.getFromSession('dealWizard')?.participantEmail || ''
       })}
       
-      <div class="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-        <p class="text-sm text-emerald-800 dark:text-emerald-300">
-          <strong>Note:</strong> Avoid wagering or betting language. This platform supports conditional agreements only.
+      <div class="p-4 bg-navy-50 dark:bg-navy-800/50 rounded-lg border border-navy-200 dark:border-navy-700">
+        <p class="text-sm text-navy-700 dark:text-navy-300">
+          💡 <strong>Tip:</strong> Be specific about what each party commits to and when.
         </p>
       </div>
       
@@ -117,11 +117,11 @@ function renderStep1(container) {
     data.description = document.getElementById('description').value;
     data.participantEmail = document.getElementById('participantEmail').value;
     
-    // Validate language
+    // Validate language (quiet check - neutral message)
     const validation = validateDealLanguage(data);
     if (!validation.valid) {
       showToast(getBlockedLanguageMessage(), 'error', 5000);
-      showToast(`Blocked terms: ${validation.errors.join(', ')}`, 'warning', 5000);
+      // Don't expose blocked terms to user - keep it neutral
       return;
     }
     
@@ -290,7 +290,7 @@ function renderStep3(container) {
       moneyAmountCents: parseInt(document.getElementById('moneyAmountB')?.value) || undefined,
     };
     
-    // Validate language in descriptions
+    // Validate language in descriptions (quiet check - neutral message)
     const validation = validateDealLanguage({
       legA: formData.legA,
       legB: formData.legB
@@ -298,7 +298,7 @@ function renderStep3(container) {
     
     if (!validation.valid) {
       showToast(getBlockedLanguageMessage(), 'error', 5000);
-      showToast(`Blocked terms: ${validation.errors.join(', ')}`, 'warning', 5000);
+      // Don't expose blocked terms to user - keep it neutral
       return;
     }
     

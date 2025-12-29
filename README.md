@@ -35,8 +35,10 @@ This guide walks you through configuring Firebase, Stripe, and deploying the com
 
 ### 🏪 Marketplace
 - **Public Listings**: Browse available deals in a public marketplace
+- **Category Filters**: Filter by Payments, Services, Goods, Accountability
 - **Create Listings**: Post deals that anyone can join
 - **Join Deals**: One-click joining with automatic deal creation
+- **Auth Gating**: Login required to browse marketplace (with redirect back)
 - **Language Validation**: All listings checked for blocked language
 
 ### 💬 Per-Deal Chat
@@ -53,7 +55,8 @@ This guide walks you through configuring Firebase, Stripe, and deploying the com
 - **Status Timeline**: Visual stepper showing deal progress
 
 ### 🎨 Beautiful UI
-- **Premium Design**: Emerald/navy/gold color scheme
+- **Premium Design**: Emerald/navy/gold color scheme with animated gradient blobs
+- **Glass Card Effects**: Frosted glass visual elements on landing page
 - **Interactive Elements**: Hover effects, animations, confetti on completions
 - **Light/Dark/System Theme**: Fully themed with persistent preferences
 - **Responsive**: Mobile-first design
@@ -61,6 +64,28 @@ This guide walks you through configuring Firebase, Stripe, and deploying the com
 - **Audit Logs**: Complete action history for transparency
 - **Skeleton Loaders**: Smooth loading states
 - **Funding Checklist**: Visual payment progress tracker
+
+### 📋 Template Gallery
+- **Pre-built Templates**: 8 common agreement types ready to use
+- **Categories**: Payments, Services, Goods, Accountability
+- **One-click Use**: Select a template and start creating immediately
+- **Templates Include**: Rent split, service completion, payment plans, loan payback, goods exchange, accountability goals, freelance projects, deposit returns
+
+### 👥 People & Connections
+- **Recent Partners**: Track people you've made agreements with
+- **Favorites**: Star frequent collaborators for quick access
+- **Quick Actions**: Start new agreements directly from connections list
+
+### 📊 Activity Feed
+- **Recent Activity**: See your latest agreement activity in one place
+- **Event Tracking**: Deal created, joined, completed, messages sent
+- **Dashboard Integration**: Activity feed sidebar on main dashboard
+
+### ⚡ Quick Actions (Dashboard)
+- **New Agreement**: Create a new deal
+- **Use Template**: Browse template gallery
+- **Marketplace**: Browse public listings
+- **People**: View connections
 
 ### 🔔 Notifications
 - **In-app Notifications**: Deal updates, actions required, completions
@@ -142,16 +167,20 @@ All agreements must be independent and standalone. No automatic triggers, extern
 │
 ├── /ui                        # UI modules
 │   ├── components.js          # Reusable components (timeline, checklist, skeletons, etc.)
-│   ├── auth.js                # Login/signup pages
-│   ├── dashboard.js           # Main dashboard
+│   ├── auth.js                # Login/signup pages with returnTo redirect
+│   ├── dashboard.js           # Main dashboard with Quick Actions + Activity Feed
 │   ├── dealWizard.js          # Create deal flow with legs model
 │   ├── dealDetail.js          # Deal detail page with tabs (Details/Chat/Activity)
 │   ├── dealsList.js           # Deal listing view
-│   ├── marketplace.js         # Public marketplace feed
+│   ├── events.js              # Activity feed and event logging system
+│   ├── marketplace.js         # Public marketplace feed with category filters
 │   ├── marketplaceNew.js      # Create marketplace listings
-│   ├── navigation.js          # Navigation components
+│   ├── navigation.js          # Navigation components (sidebar + mobile)
 │   ├── notifications.js       # Notifications panel
+│   ├── people.js              # Connections and favorites management
 │   ├── settings.js            # Settings page
+│   ├── templates.js           # Agreement template gallery
+│   ├── terms.js               # Terms & Policy page
 │   └── account.js             # Account management
 │
 └── /firebase-functions        # Firebase Cloud Functions (NOT Cloudflare Pages Functions)
@@ -167,7 +196,29 @@ All agreements must be independent and standalone. No automatic triggers, extern
         └── dealMachine.ts     # State machine with outcome_proposed/confirmed
 ```
 
-**Note on Routing:** This app uses **hash-based routing** (`#/app`, `#/deal/123`) which works perfectly with static hosting on Cloudflare Pages without needing server-side redirects. All navigation is client-side via the hash router.
+**Note on Routing:** This app uses **hash-based routing** which works perfectly with static hosting on Cloudflare Pages without needing server-side redirects.
+
+### Available Routes
+| Route | Description |
+|-------|-------------|
+| `/` | Landing page with animated blobs (public) |
+| `/login` | Login page |
+| `/signup` | Signup page |
+| `/app` | Main dashboard with Quick Actions + Activity Feed |
+| `/deals` | List of all your deals |
+| `/deal/:id` | Deal detail with tabs (Details/Chat/Activity) |
+| `/deal/:id/chat` | Deal chat direct link |
+| `/deal/:id/activity` | Deal activity direct link |
+| `/new` | Create new agreement wizard |
+| `/templates` | Agreement template gallery |
+| `/people` | Connections and favorites |
+| `/marketplace` | Public marketplace (requires auth) |
+| `/marketplace/new` | Create marketplace listing |
+| `/marketplace/:id` | Listing detail |
+| `/settings` | User settings |
+| `/account` | Account management |
+| `/notifications` | Notifications panel |
+| `/terms` | Terms & Policy |
 
 **Note on Functions:** The `/firebase-functions` directory contains Firebase Cloud Functions (backend), NOT Cloudflare Pages Functions. This directory is named to avoid confusion with Cloudflare's build system.
 

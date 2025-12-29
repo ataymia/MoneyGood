@@ -59,7 +59,15 @@ export function renderLogin() {
     try {
       await signInWithEmailAndPassword(window.auth, email, password);
       showToast('Login successful!', 'success');
-      router.navigate('/app');
+      
+      // Check for returnTo destination (e.g., from marketplace gating)
+      const returnTo = sessionStorage.getItem('returnTo');
+      if (returnTo) {
+        sessionStorage.removeItem('returnTo');
+        router.navigate(returnTo);
+      } else {
+        router.navigate('/app');
+      }
     } catch (error) {
       console.error('Login error:', error);
       showToast(error.message || 'Login failed. Please try again.', 'error');
@@ -139,7 +147,20 @@ export function renderSignup() {
     try {
       await createUserWithEmailAndPassword(window.auth, email, password);
       showToast('Account created successfully!', 'success');
-      router.navigate('/app');
+      
+      // Check for returnTo destination or pending template
+      const returnTo = sessionStorage.getItem('returnTo');
+      const pendingTemplate = sessionStorage.getItem('pendingTemplate');
+      
+      if (pendingTemplate) {
+        sessionStorage.removeItem('pendingTemplate');
+        window.useTemplate(pendingTemplate);
+      } else if (returnTo) {
+        sessionStorage.removeItem('returnTo');
+        router.navigate(returnTo);
+      } else {
+        router.navigate('/app');
+      }
     } catch (error) {
       console.error('Signup error:', error);
       showToast(error.message || 'Signup failed. Please try again.', 'error');

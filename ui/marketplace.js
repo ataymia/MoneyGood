@@ -1,48 +1,82 @@
 import { Navbar, showToast, Spinner, SkeletonList, formatCurrency, formatRelativeTime } from './components.js';
+import { renderSidebar, renderMobileNav } from './navigation.js';
 import { collection, query, where, orderBy, getDocs, getDoc, doc, addDoc, serverTimestamp } from '../firebaseClient.js';
 import { store } from '../store.js';
 import { router } from '../router.js';
+
+// Marketplace categories
+const MARKETPLACE_CATEGORIES = [
+  { id: 'all', label: 'All', icon: '📋' },
+  { id: 'payments', label: 'Payments', icon: '💵' },
+  { id: 'services', label: 'Services', icon: '🛠️' },
+  { id: 'goods', label: 'Goods', icon: '📦' },
+  { id: 'accountability', label: 'Accountability', icon: '🎯' },
+  { id: 'other', label: 'Other', icon: '✨' }
+];
 
 export async function renderMarketplace() {
   const { user } = store.getState();
   
   const content = document.getElementById('content');
   content.innerHTML = `
-    <div class="flex flex-col h-screen bg-navy-50 dark:bg-navy-900">
-      ${Navbar({ user })}
-      <div class="flex-1 overflow-y-auto py-8">
-        <div class="container mx-auto px-4">
+    <div class="flex h-screen bg-navy-50 dark:bg-navy-900">
+      ${user ? renderSidebar(user) : ''}
+      <div class="flex-1 overflow-y-auto">
+        ${Navbar({ user })}
+        <div class="container mx-auto px-4 py-8">
           <div class="max-w-6xl mx-auto">
-            <div class="flex items-center justify-between mb-8">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-6">
               <div>
                 <h1 class="text-3xl font-bold text-navy-900 dark:text-white mb-2">Marketplace</h1>
-                <p class="text-navy-600 dark:text-navy-400">Browse and join open agreements</p>
+                <p class="text-navy-600 dark:text-navy-400">Browse open agreement offers</p>
               </div>
-              ${user ? `
-                <a 
-                  href="#/marketplace/new" 
-                  class="btn-primary bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition"
-                >
-                  + Create Listing
-                </a>
-              ` : `
-                <a 
-                  href="#/login" 
-                  class="btn-primary bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition"
-                >
-                  Login to Post
-                </a>
-              `}
+              <a 
+                href="#/marketplace/new" 
+                class="btn-primary bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition btn-press"
+              >
+                + Create Listing
+              </a>
             </div>
             
+            <!-- Category Filters -->
+            <div class="flex flex-wrap gap-2 mb-6">
+              ${MARKETPLACE_CATEGORIES.map(cat => `
+                <button 
+                  onclick="window.filterMarketplace('${cat.id}')"
+                  class="category-filter px-4 py-2 rounded-full text-sm font-medium transition-all ${cat.id === 'all' ? 'active' : ''}"
+                  data-category="${cat.id}"
+                >
+                  ${cat.icon} ${cat.label}
+                </button>
+              `).join('')}
+            </div>
+            
+            <!-- Listings Grid -->
             <div id="listings-container">
-              ${SkeletonList({ count: 5 })}
+              ${SkeletonList({ count: 6 })}
             </div>
           </div>
         </div>
       </div>
+      ${user ? renderMobileNav(user) : ''}
     </div>
   `;
+  
+  // Setup filter function
+  window.filterMarketplace = (category) => {
+    const buttons = document.querySelectorAll('.category-filter');
+    buttons.forEach(btn => btn.classList.toggle('active', btn.dataset.category === category));
+    
+    const cards = document.querySelectorAll('.listing-card');
+    cards.forEach(card => {
+      if (category === 'all' || card.dataset.category === category) {
+        card.style.display = 'block';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  };
   
   loadListings();
 }
@@ -65,8 +99,10 @@ async function loadListings() {
     console.error('Error loading listings:', error);
     showToast('Failed to load listings', 'error');
     document.getElementById('listings-container').innerHTML = `
-      <div class="text-center py-12">
-        <p class="text-navy-600 dark:text-navy-400">Failed to load listings. Please try again.</p>
+      <div class="empty-state">
+        <div class="empty-state-icon">😕</div>
+        <h3 class="empty-state-title">Couldn't load listings</h3>
+        <p class="empty-state-description">Please try refreshing the page</p>
       </div>
     `;
   }
@@ -77,22 +113,29 @@ function renderListings(listings) {
   
   if (listings.length === 0) {
     container.innerHTML = `
-      <div class="text-center py-12">
-        <div class="text-6xl mb-4">📋</div>
-        <p class="text-xl text-navy-600 dark:text-navy-400 mb-4">No open listings yet</p>
-        <p class="text-navy-600 dark:text-navy-400">Be the first to create one!</p>
+      <div class="empty-state card">
+        <div class="empty-state-icon">📋</div>
+        <h3 class="empty-state-title">No open listings yet</h3>
+        <p class="empty-state-description">Be the first to create a listing!</p>
+        <a href="#/marketplace/new" class="btn-primary bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition btn-press">
+          Create Listing
+        </a>
       </div>
     `;
     return;
   }
   
   container.innerHTML = `
-    <div class="grid grid-cols-1 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       ${listings.map(listing => `
-        <div class="card p-6 cursor-pointer hover:shadow-xl transition" onclick="window.location.hash = '/marketplace/${listing.id}'">
+        <div 
+          class="listing-card card p-6 cursor-pointer hover-lift group" 
+          data-category="${listing.category || 'other'}"
+          onclick="window.location.hash = '/marketplace/${listing.id}'"
+        >
           <div class="flex items-start justify-between mb-3">
             <div class="flex-1">
-              <h3 class="text-xl font-bold text-navy-900 dark:text-white mb-1">${listing.title}</h3>
+              <h3 class="text-lg font-bold text-navy-900 dark:text-white mb-1 group-hover:text-emerald-600 transition">${listing.title}</h3>
               <p class="text-sm text-navy-600 dark:text-navy-400 line-clamp-2">${listing.description}</p>
             </div>
             <span class="status-badge status-${listing.status} ml-4">${listing.status}</span>
